@@ -18,7 +18,7 @@ env_logger = "0.11.3"
 log = "0.4.21"
 
 aes-gcm = "0.10.3"
-bcrypt = "0.15.1"
+bcrypt = "0.16.0"
 rand = "0.8.5"
 
 actix-web = "4.5.1"
@@ -37,6 +37,6 @@ ulid = "1.1.2"
 lettre = { version = "0.11", features = ["async-std1", "async-std1-rustls-tls", "builder", "smtp-transport"], default-features = false }
 
 totp-rs = { version = "5.5.1", features = ["qr"] }
-passkey = "0.2.0"
+passkey = "0.3.0"
 opaque-ke = "3.0.0-pre.4"
 dotenvy = "0.15.7"
