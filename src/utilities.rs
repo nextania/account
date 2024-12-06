@@ -9,13 +9,23 @@ use actix_extensible_rate_limit::{
 use actix_web::{dev::ServiceRequest, HttpResponse};
 use aes_gcm::{aead::Aead, Aes256Gcm, Nonce};
 use lazy_static::lazy_static;
-use lettre::{message::header::ContentType, transport::smtp::authentication::Credentials, AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message};
+use lettre::{
+    message::header::ContentType, transport::smtp::authentication::Credentials, AsyncSmtpTransport,
+    AsyncStd1Executor, AsyncTransport, Message,
+};
 use mongodb::bson::doc;
 use rand::{distributions::Alphanumeric, rngs::StdRng, thread_rng, Rng, SeedableRng};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{database::session, environment::{HCAPTCHA_SECRET, PUBLIC_ROOT, SMTP_FROM, SMTP_PASSWORD, SMTP_SERVER, SMTP_USERNAME}, errors::Error, routes::login};
+use crate::{
+    database::session,
+    environment::{
+        HCAPTCHA_SECRET, PUBLIC_ROOT, SMTP_FROM, SMTP_PASSWORD, SMTP_SERVER, SMTP_USERNAME,
+    },
+    errors::Error,
+    routes::login,
+};
 
 lazy_static! {
     pub static ref USERNAME_RE: Regex = Regex::new(r"^[0-9A-Za-z_.-]{3,32}$").expect("Unexpected error: failed to process regex");
@@ -113,7 +123,11 @@ pub fn create_success_rate_limiter(
 }
 
 pub fn generate_continue_token_long() -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(128).map(char::from).collect()
+    thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(128)
+        .map(char::from)
+        .collect()
 }
 
 pub async fn send_email(to: String, subject: String, body: String) -> crate::errors::Result<()> {
@@ -137,8 +151,14 @@ pub async fn send_email(to: String, subject: String, body: String) -> crate::err
         .body(body)
         .map_err(|_| Error::EmailMisconfigured)?;
     let creds = Credentials::new(username.to_string(), password.to_string());
-    let mailer = AsyncSmtpTransport::<AsyncStd1Executor>::relay(server).expect("failed to set server").credentials(creds).build();
-    mailer.send(email).await.map_err(|_| Error::InternalEmailError)?;
+    let mailer = AsyncSmtpTransport::<AsyncStd1Executor>::relay(server)
+        .expect("failed to set server")
+        .credentials(creds)
+        .build();
+    mailer
+        .send(email)
+        .await
+        .map_err(|_| Error::InternalEmailError)?;
     Ok(())
 }
 
@@ -168,10 +188,7 @@ pub async fn validate_captcha(token: String) -> crate::errors::Result<()> {
     let client = reqwest::Client::new();
     let result = client
         .post("https://hcaptcha.com/siteverify")
-        .query(&[
-            ("response", token),
-            ("secret", HCAPTCHA_SECRET.to_string()),
-        ])
+        .query(&[("response", token), ("secret", HCAPTCHA_SECRET.to_string())])
         .send()
         .await;
     let Ok(result) = result else {
@@ -192,7 +209,10 @@ pub async fn validate_captcha(token: String) -> crate::errors::Result<()> {
     Ok(())
 }
 
-pub async fn validate_escalation(escalation_token: String, token: String) -> crate::errors::Result<String> {
+pub async fn validate_escalation(
+    escalation_token: String,
+    token: String,
+) -> crate::errors::Result<String> {
     let escalate = login::ACTIVE_ESCALATIONS.get(&escalation_token);
     let Some(escalate) = escalate else {
         return Err(Error::SessionExpired);
@@ -214,7 +234,7 @@ pub async fn validate_escalation(escalation_token: String, token: String) -> cra
         return Err(Error::SessionExpired);
     }
 
-    let user_session = sessions.find_one(doc!{ "token": token }).await?;
+    let user_session = sessions.find_one(doc! { "token": token }).await?;
     if user_session.is_none() {
         return Err(Error::SessionExpired);
     }

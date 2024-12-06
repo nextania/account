@@ -5,12 +5,18 @@ use lazy_static::lazy_static;
 use mongodb::bson::doc;
 use opaque_ke::{CredentialFinalization, CredentialRequest, ServerLogin};
 use serde::{Deserialize, Serialize};
-use ulid::Ulid;
 use std::time::{SystemTime, UNIX_EPOCH};
 use totp_rs::{Algorithm, Secret, TOTP};
+use ulid::Ulid;
 
 use crate::{
-    authenticate::UserJwt, constants::{LONG_SESSION, SHORT_SESSION}, database::{self, session::Session, user::User}, environment::JWT_SECRET, errors::{Error, Result}, opaque::{begin_login, finish_login, Default}, utilities::generate_continue_token_long
+    authenticate::UserJwt,
+    constants::{LONG_SESSION, SHORT_SESSION},
+    database::{self, session::Session, user::User},
+    environment::JWT_SECRET,
+    errors::{Error, Result},
+    opaque::{begin_login, finish_login, Default},
+    utilities::generate_continue_token_long,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -23,7 +29,7 @@ pub enum Login {
 
         escalate: bool,
         // req'd if escalating an existing session
-        token: Option<String>
+        token: Option<String>,
     } = 1,
     FinishLogin {
         message: Vec<u8>,
@@ -54,7 +60,6 @@ pub enum LoginResponse {
         token: String,
     } = 3,
 }
-
 
 pub struct PendingLogin {
     pub time: u64,
@@ -88,7 +93,12 @@ lazy_static! {
 pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
     let login = login.into_inner();
     match login {
-        Login::BeginLogin { email, message, escalate, token } => {   
+        Login::BeginLogin {
+            email,
+            message,
+            escalate,
+            token,
+        } => {
             let existing_session = if escalate {
                 let Some(token) = token else {
                     return Err(Error::MissingToken);
@@ -98,7 +108,8 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                     .find_one(doc! {
                         "token": token.clone()
                     })
-                    .await?.ok_or(Error::SessionExpired)?;
+                    .await?
+                    .ok_or(Error::SessionExpired)?;
                 Some(session)
             } else {
                 None
@@ -110,7 +121,12 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 })
                 .await?;
             let password_data = user.clone().map(|x| x.password_data);
-            let (data, state) = begin_login(email.clone(), password_data, CredentialRequest::deserialize(&message)?).await?;
+            let (data, state) = begin_login(
+                email.clone(),
+                password_data,
+                CredentialRequest::deserialize(&message)?,
+            )
+            .await?;
             let continue_token = generate_continue_token_long();
             let duration = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -130,7 +146,12 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 message: data,
             }))
         }
-        Login::FinishLogin { message, continue_token, persist, friendly_name } => {
+        Login::FinishLogin {
+            message,
+            continue_token,
+            persist,
+            friendly_name,
+        } => {
             let pending_login = PENDING_LOGINS.get(&continue_token);
             let pending_login = match pending_login {
                 Some(pending_login) => pending_login,
@@ -144,7 +165,10 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 PENDING_LOGINS.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            finish_login(pending_login.data.clone(), CredentialFinalization::deserialize(&message)?)?;
+            finish_login(
+                pending_login.data.clone(),
+                CredentialFinalization::deserialize(&message)?,
+            )?;
             let user = pending_login.user.clone();
             if user.mfa_enabled {
                 let new_continue_token = generate_continue_token_long();
@@ -215,7 +239,10 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 }))
             }
         }
-        Login::Mfa { code, continue_token } => {
+        Login::Mfa {
+            code,
+            continue_token,
+        } => {
             let mfa_session = PENDING_MFAS.get(&continue_token);
             let Some(mfa_session) = mfa_session else {
                 return Err(Error::SessionExpired);
@@ -270,7 +297,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             let id = mfa_session.user.id.clone();
             let token = encode(
                 &Header::default(),
-                & UserJwt {
+                &UserJwt {
                     id: id.clone(),
                     issued_at: millis,
                     expires_at,
@@ -293,7 +320,10 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 let session = Session {
                     id: sid,
                     token: token.clone(),
-                    friendly_name: mfa_session.friendly_name.clone().unwrap_or("Unknown".to_owned()),
+                    friendly_name: mfa_session
+                        .friendly_name
+                        .clone()
+                        .unwrap_or("Unknown".to_owned()),
                     user_id: id,
                 };
                 let sessions = crate::database::session::get_collection();
@@ -301,9 +331,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             }
             drop(mfa_session);
             PENDING_MFAS.remove(&continue_token);
-            Ok(web::Json(LoginResponse::Mfa {
-                token,
-            }))
+            Ok(web::Json(LoginResponse::Mfa { token }))
         }
     }
 }

@@ -1,9 +1,10 @@
 pub mod code;
 pub mod files;
+pub mod passkey;
 pub mod profile;
 pub mod session;
+pub mod settings;
 pub mod user;
-pub mod passkey;
 
 use log::info;
 use mongodb::{Client, Database};

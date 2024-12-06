@@ -8,10 +8,14 @@ use serde::{Deserialize, Serialize};
 use totp_rs::{Secret, TOTP};
 
 use crate::{
-    authenticate::Authenticate, database::{
+    authenticate::Authenticate,
+    database::{
         code,
         user::{self, User},
-    }, environment::SERVICE_NAME, errors::{Error, Result}, utilities::{generate_codes, random_number, validate_escalation}
+    },
+    environment::SERVICE_NAME,
+    errors::{Error, Result},
+    utilities::{generate_codes, random_number, validate_escalation},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -119,8 +123,11 @@ pub async fn handle(
                 }))
             }
         }
-        Mfa::EnableVerify { code, continue_token } => {
-            let enable_session = PENDING_MFA_SETUPS.get(&continue_token); 
+        Mfa::EnableVerify {
+            code,
+            continue_token,
+        } => {
+            let enable_session = PENDING_MFA_SETUPS.get(&continue_token);
             if let Some(enable_session) = enable_session {
                 let duration = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -153,7 +160,7 @@ pub async fn handle(
                     .await?;
                 drop(enable_session);
                 PENDING_MFA_SETUPS.remove(&continue_token);
-                Ok(web::Json(MfaResponse::EnableVerify {  }))
+                Ok(web::Json(MfaResponse::EnableVerify {}))
             } else {
                 Err(Error::InvalidToken)
             }

@@ -8,7 +8,5 @@ pub fn create_webauthn() -> Data<Webauthn> {
     let builder = WebauthnBuilder::new(&RP_ID, &rp_origin)
         .expect("Invalid configuration")
         .rp_name(&SERVICE_NAME);
-    let webauthn = Data::new(builder.build().expect("Invalid configuration"));
-
-    webauthn
+    Data::new(builder.build().expect("Invalid configuration"))
 }

@@ -1,15 +1,26 @@
-use actix_web::{web::{self, Data}, Responder};
+use actix_web::{
+    web::{self, Data},
+    Responder,
+};
 use dashmap::DashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
 use mongodb::bson::{self, doc, Binary};
 use serde::{Deserialize, Serialize};
-use ulid::Ulid;
-use webauthn_rs::{prelude::{PasskeyAuthentication, PublicKeyCredential, RequestChallengeResponse}, Webauthn};
 use std::time::{SystemTime, UNIX_EPOCH};
+use ulid::Ulid;
+use webauthn_rs::{
+    prelude::{PasskeyAuthentication, PublicKeyCredential, RequestChallengeResponse},
+    Webauthn,
+};
 
 use crate::{
-    authenticate::UserJwt, constants::{LONG_SESSION, SHORT_SESSION}, database::{self, passkey::get_collection, session::Session}, environment::JWT_SECRET, errors::{Error, Result}, utilities::generate_continue_token_long
+    authenticate::UserJwt,
+    constants::{LONG_SESSION, SHORT_SESSION},
+    database::{self, passkey::get_collection, session::Session},
+    environment::JWT_SECRET,
+    errors::{Error, Result},
+    utilities::generate_continue_token_long,
 };
 
 use super::login::{ActiveEscalation, ACTIVE_ESCALATIONS};
@@ -21,7 +32,7 @@ pub enum Login {
     BeginLogin {
         escalate: bool,
         // req'd if escalating an existing session
-        token: Option<String>
+        token: Option<String>,
     } = 1,
     FinishLogin {
         message: PublicKeyCredential,
@@ -44,7 +55,6 @@ pub enum LoginResponse {
     } = 2,
 }
 
-
 pub struct PendingLogin {
     pub time: u64,
     pub data: PasskeyAuthentication,
@@ -58,7 +68,7 @@ lazy_static! {
 pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result<impl Responder> {
     let login = login.into_inner();
     match login {
-        Login::BeginLogin { escalate, token } => {   
+        Login::BeginLogin { escalate, token } => {
             let existing_session = if escalate {
                 let Some(token) = token else {
                     return Err(Error::MissingToken);
@@ -68,28 +78,36 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                     .find_one(doc! {
                         "token": token.clone()
                     })
-                    .await?.ok_or(Error::SessionExpired)?;
+                    .await?
+                    .ok_or(Error::SessionExpired)?;
                 Some(session)
             } else {
                 None
             };
-            let (rcr, auth_state) = webauthn
-                .start_passkey_authentication(&[])?;
+            let (rcr, auth_state) = webauthn.start_passkey_authentication(&[])?;
             let continue_token = generate_continue_token_long();
             let duration = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Unexpected error: time went backwards");
-            PENDING_LOGINS.insert(continue_token.clone(), PendingLogin {
-                time: duration.as_secs(),
-                data: auth_state,
-                existing_session,
-            });
+            PENDING_LOGINS.insert(
+                continue_token.clone(),
+                PendingLogin {
+                    time: duration.as_secs(),
+                    data: auth_state,
+                    existing_session,
+                },
+            );
             Ok(web::Json(LoginResponse::BeginLogin {
                 continue_token,
                 message: rcr,
             }))
         }
-        Login::FinishLogin { message, continue_token, persist, friendly_name } => {
+        Login::FinishLogin {
+            message,
+            continue_token,
+            persist,
+            friendly_name,
+        } => {
             let pending_login = PENDING_LOGINS.get(&continue_token);
             let pending_login = match pending_login {
                 Some(pending_login) => pending_login,
@@ -103,8 +121,8 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                 PENDING_LOGINS.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let auth_result = webauthn
-                .finish_passkey_authentication(&message, &pending_login.data)?;
+            let auth_result =
+                webauthn.finish_passkey_authentication(&message, &pending_login.data)?;
             let credential_id = auth_result.cred_id().as_ref();
             let bin = Binary {
                 subtype: bson::spec::BinarySubtype::Generic,
@@ -114,12 +132,14 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                 .find_one(doc! {
                     "credential_id": bin
                 })
-                .await?.ok_or(Error::UserNotFound)?;
+                .await?
+                .ok_or(Error::UserNotFound)?;
             let user = database::user::get_collection()
                 .find_one(doc! {
                     "id": passkey.user_id.clone()
                 })
-                .await?.ok_or(Error::UserNotFound)?;
+                .await?
+                .ok_or(Error::UserNotFound)?;
             if let Some(s) = &pending_login.existing_session {
                 if user.id != s.user_id {
                     return Err(Error::UserMismatch);
@@ -165,9 +185,7 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
             }
             drop(pending_login);
             PENDING_LOGINS.remove(&continue_token);
-            Ok(web::Json(LoginResponse::FinishLogin {
-                token,
-            }))
+            Ok(web::Json(LoginResponse::FinishLogin { token }))
         }
     }
 }

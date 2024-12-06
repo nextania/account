@@ -13,9 +13,7 @@ use crate::{
 pub struct DeleteResponse {}
 
 // TODO: security concerns? potentially add a grace period
-pub async fn handle(
-    jwt: web::ReqData<Result<Authenticate>>,
-) -> Result<impl Responder> {
+pub async fn handle(jwt: web::ReqData<Result<Authenticate>>) -> Result<impl Responder> {
     let jwt = jwt.into_inner()?;
     let collection = user::get_collection();
     let sessions = session::get_collection();

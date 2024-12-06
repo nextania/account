@@ -1,14 +1,26 @@
-use actix_web::{web::{self, Data}, Responder};
+use actix_web::{
+    web::{self, Data},
+    Responder,
+};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
-use ulid::Ulid;
-use webauthn_rs::{prelude::{CreationChallengeResponse, PasskeyRegistration, RegisterPublicKeyCredential}, Webauthn};
 use std::time::{SystemTime, UNIX_EPOCH};
+use ulid::Ulid;
+use webauthn_rs::{
+    prelude::{CreationChallengeResponse, PasskeyRegistration, RegisterPublicKeyCredential},
+    Webauthn,
+};
 
 use crate::{
-    authenticate::Authenticate, database::{passkey::{self, Passkey}, user::User}, errors::{Error, Result}, utilities::{generate_continue_token_long, validate_escalation}
+    authenticate::Authenticate,
+    database::{
+        passkey::{self, Passkey},
+        user::User,
+    },
+    errors::{Error, Result},
+    utilities::{generate_continue_token_long, validate_escalation},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -21,7 +33,7 @@ pub enum Register {
     FinishRegister {
         message: RegisterPublicKeyCredential,
         continue_token: String,
-        friendly_name: Option<String>
+        friendly_name: Option<String>,
     } = 2,
 }
 
@@ -48,8 +60,8 @@ lazy_static! {
 
 pub async fn handle(
     jwt: web::ReqData<Result<Authenticate>>,
-    register: web::Json<Register>, 
-    webauthn: Data<Webauthn>
+    register: web::Json<Register>,
+    webauthn: Data<Webauthn>,
 ) -> Result<impl Responder> {
     let register = register.into_inner();
     match register {
@@ -59,9 +71,13 @@ pub async fn handle(
                 .find_one(doc! {
                     "id": user_id.clone()
                 })
-                .await?.ok_or(Error::UserNotFound)?;
-            let uuid = webauthn_rs::prelude::Uuid::from_bytes(Ulid::from_string(&user.id).expect("S").to_bytes());
-            let (ccr, reg_state) = webauthn.start_passkey_registration(uuid, &user.username, &user.username, None)?;
+                .await?
+                .ok_or(Error::UserNotFound)?;
+            let uuid = webauthn_rs::prelude::Uuid::from_bytes(
+                Ulid::from_string(&user.id).expect("S").to_bytes(),
+            );
+            let (ccr, reg_state) =
+                webauthn.start_passkey_registration(uuid, &user.username, &user.username, None)?;
             let continue_token = generate_continue_token_long();
             let duration = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -78,7 +94,11 @@ pub async fn handle(
                 message: ccr,
             }))
         }
-        Register::FinishRegister { message, continue_token, friendly_name } => {
+        Register::FinishRegister {
+            message,
+            continue_token,
+            friendly_name,
+        } => {
             let pending_register = PENDING_REGISTERS.get(&continue_token);
             let Some(pending_register) = pending_register else {
                 return Err(Error::SessionExpired);
@@ -91,7 +111,8 @@ pub async fn handle(
                 PENDING_REGISTERS.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let auth_result = webauthn.finish_passkey_registration(&message, &pending_register.data)?;
+            let auth_result =
+                webauthn.finish_passkey_registration(&message, &pending_register.data)?;
             let credential_id = auth_result.cred_id().as_ref().to_vec();
             let user = pending_register.user.clone();
             passkey::get_collection()

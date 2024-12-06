@@ -1,6 +1,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{constants::CONTINUE_TIMEOUT, routes::{forgot, login, mfa, register}};
+use crate::{
+    constants::CONTINUE_TIMEOUT,
+    routes::{forgot, login, mfa, register},
+};
 
 pub fn run() {
     let now = SystemTime::now()

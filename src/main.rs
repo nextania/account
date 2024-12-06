@@ -23,10 +23,10 @@ pub mod constants;
 pub mod database;
 pub mod environment;
 pub mod errors;
-pub mod routes;
-pub mod utilities;
 pub mod opaque;
 pub mod passkey;
+pub mod routes;
+pub mod utilities;
 
 #[async_std::main]
 async fn main() {
@@ -74,8 +74,12 @@ async fn main() {
                     .wrap(create_rate_limiter(Duration::from_secs(5), 20))
                     .wrap(JwtAuthentication)
                     .route("/", web::get().to(routes::service::handle))
-                    .route("/forgot", web::post().to(routes::forgot::handle)
-                    .wrap(create_success_rate_limiter(Duration::from_secs(21600), 10)))
+                    .route(
+                        "/forgot",
+                        web::post()
+                            .to(routes::forgot::handle)
+                            .wrap(create_success_rate_limiter(Duration::from_secs(21600), 10)),
+                    )
                     .route("/user", web::patch().to(routes::account_settings::handle))
                     .route("/user", web::get().to(routes::current_user::handle))
                     .route("/user", web::delete().to(routes::delete::handle))
@@ -105,8 +109,14 @@ async fn main() {
                             .wrap(create_success_rate_limiter(Duration::from_secs(21600), 5)),
                     ) // 6 hours
                     .route("/user/{id}", web::get().to(routes::user::handle))
-                    .route("/session/passkeys", web::post().to(routes::login_passkey::handle))
-                    .route("/user/passkeys", web::post().to(routes::register_passkey::handle))
+                    .route(
+                        "/session/passkeys",
+                        web::post().to(routes::login_passkey::handle),
+                    )
+                    .route(
+                        "/user/passkeys",
+                        web::post().to(routes::register_passkey::handle),
+                    )
                     .route(
                         "/validate",
                         web::post()

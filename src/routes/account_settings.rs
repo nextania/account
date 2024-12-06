@@ -4,10 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     authenticate::Authenticate,
-    database::
-        user::get_collection
-    ,
-    errors::{Error, Result}, utilities::{validate_escalation, EMAIL_RE, USERNAME_RE},
+    database::user::get_collection,
+    errors::{Error, Result},
+    utilities::{validate_escalation, EMAIL_RE, USERNAME_RE},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -22,7 +21,6 @@ pub struct AccountSettings {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountSettingsResponse {}
-
 
 pub async fn handle(
     jwt: web::ReqData<Result<Authenticate>>,

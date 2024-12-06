@@ -21,8 +21,12 @@ lazy_static! {
     pub static ref SMTP_PASSWORD: Option<String> = env::var("SMTP_PASSWORD").ok();
     pub static ref SMTP_SERVER: Option<String> = env::var("SMTP_SERVER").ok();
     pub static ref SMTP_FROM: Option<String> = env::var("SMTP_FROM").ok();
-    pub static ref SMTP_ENABLED: bool = SMTP_USERNAME.is_some() && SMTP_PASSWORD.is_some() && SMTP_SERVER.is_some() && SMTP_FROM.is_some();
+    pub static ref SMTP_ENABLED: bool = SMTP_USERNAME.is_some()
+        && SMTP_PASSWORD.is_some()
+        && SMTP_SERVER.is_some()
+        && SMTP_FROM.is_some();
     pub static ref PUBLIC_ROOT: String = env::var("PUBLIC_ROOT").expect("PUBLIC_ROOT must be set");
-    pub static ref SERVICE_NAME: String = env::var("SERVICE_NAME").expect("SERVICE_NAME must be set");
+    pub static ref SERVICE_NAME: String =
+        env::var("SERVICE_NAME").expect("SERVICE_NAME must be set");
     pub static ref RP_ID: String = env::var("RP_ID").expect("RP_ID must be set");
 }

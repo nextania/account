@@ -4,14 +4,22 @@ use actix_web::{web, Responder};
 use async_std::task;
 use dashmap::DashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
+use lazy_static::lazy_static;
 use mongodb::bson::doc;
 use opaque_ke::{RegistrationRequest, RegistrationUpload};
 use serde::{Deserialize, Serialize};
-use lazy_static::lazy_static;
 use ulid::Ulid;
 
 use crate::{
-    authenticate::UserJwt, database::{profile::UserProfile, session::Session, user::User}, environment::{JWT_SECRET, SMTP_ENABLED}, errors::{Error, Result}, opaque::{begin_registration, finish_registration}, utilities::{generate_codes, generate_continue_token_long, send_in_use_email, send_verify_email, validate_captcha, EMAIL_RE, USERNAME_RE}
+    authenticate::UserJwt,
+    database::{profile::UserProfile, session::Session, user::User},
+    environment::{JWT_SECRET, SMTP_ENABLED},
+    errors::{Error, Result},
+    opaque::{begin_registration, finish_registration},
+    utilities::{
+        generate_codes, generate_continue_token_long, send_in_use_email, send_verify_email,
+        validate_captcha, EMAIL_RE, USERNAME_RE,
+    },
 };
 
 #[derive(Deserialize, Serialize)]
@@ -75,7 +83,10 @@ lazy_static! {
 pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
     let register = register.into_inner();
     match register {
-        Register::VerifyEmail { email, captcha_token } => {
+        Register::VerifyEmail {
+            email,
+            captcha_token,
+        } => {
             validate_captcha(captcha_token).await?;
             if !EMAIL_RE.is_match(email.trim()) {
                 return Err(Error::InvalidEmail);
@@ -90,15 +101,18 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 if user.is_some() {
                     task::spawn(send_in_use_email(email.clone()));
                 } else {
-                    let token = generate_codes().get(0).unwrap().to_string();
+                    let token = generate_codes().first().unwrap().to_string();
                     task::spawn(send_verify_email(email.clone(), token.clone()));
-                    PENDING_REGISTERS1.insert(token, PendingRegister {
-                        time: SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .expect("Unexpected error: time went backwards")
-                            .as_secs(),
-                        email,
-                    });
+                    PENDING_REGISTERS1.insert(
+                        token,
+                        PendingRegister {
+                            time: SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .expect("Unexpected error: time went backwards")
+                                .as_secs(),
+                            email,
+                        },
+                    );
                 }
                 Ok(web::Json(RegisterResponse::VerifyEmail {
                     email_enabled: true,
@@ -124,18 +138,35 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                     PENDING_REGISTERS1.remove(&token);
                     return Err(Error::SessionExpired);
                 }
-                let result = begin_registration(session.email.clone(), RegistrationRequest::deserialize(&message)?).await?;
+                let result = begin_registration(
+                    session.email.clone(),
+                    RegistrationRequest::deserialize(&message)?,
+                )
+                .await?;
                 PENDING_REGISTERS1.remove(&token);
                 let continue_token = generate_continue_token_long();
-                PENDING_REGISTERS2.insert(continue_token.clone(), PendingRegister {
-                    time: duration,
-                    email: session.email.clone(),
-                });
-                return Ok(web::Json(RegisterResponse::BeginRegistration { continue_token, message: result }));
+                PENDING_REGISTERS2.insert(
+                    continue_token.clone(),
+                    PendingRegister {
+                        time: duration,
+                        email: session.email.clone(),
+                    },
+                );
+                return Ok(web::Json(RegisterResponse::BeginRegistration {
+                    continue_token,
+                    message: result,
+                }));
             }
             Err(Error::InvalidToken)
         }
-        Register::Register { friendly_name, username, persist, display_name, message, token } => {
+        Register::Register {
+            friendly_name,
+            username,
+            persist,
+            display_name,
+            message,
+            token,
+        } => {
             if let Some(session) = PENDING_REGISTERS2.get(&token) {
                 let duration = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -151,7 +182,8 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 if !USERNAME_RE.is_match(username.trim()) {
                     return Err(Error::InvalidUsername);
                 }
-                let password_data = finish_registration(RegistrationUpload::deserialize(&message)?)?;
+                let password_data =
+                    finish_registration(RegistrationUpload::deserialize(&message)?)?;
                 let user_id = Ulid::new().to_string();
                 let user_document = User {
                     id: user_id.clone(),
