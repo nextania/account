@@ -2,13 +2,17 @@ use std::fmt::Display;
 
 use actix_web::ResponseError;
 use log::error;
+use opaque_ke::errors::ProtocolError;
 use serde::{Deserialize, Serialize};
+use webauthn_rs::prelude::WebauthnError;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "error", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Error {
     MissingToken,
     InvalidToken,
+    BadCrypto,
+    UserMismatch,
 
     DatabaseError,
 
@@ -60,6 +64,8 @@ impl ResponseError for Error {
         match self {
             Error::MissingToken => actix_web::http::StatusCode::UNAUTHORIZED,
             Error::InvalidToken => actix_web::http::StatusCode::UNAUTHORIZED,
+            Error::BadCrypto => actix_web::http::StatusCode::BAD_REQUEST,
+            Error::UserMismatch => actix_web::http::StatusCode::UNAUTHORIZED,
 
             Error::DatabaseError => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
 
@@ -110,6 +116,18 @@ impl From<mongodb::error::Error> for Error {
     fn from(db: mongodb::error::Error) -> Self {
         error!("Database error: {}", db);
         Error::DatabaseError
+    }
+}
+
+impl From<ProtocolError> for Error {
+    fn from(_: ProtocolError) -> Self {
+        Error::BadCrypto
+    }
+}
+
+impl From<WebauthnError> for Error {
+    fn from(_: WebauthnError) -> Self {
+        Error::BadCrypto
     }
 }
 

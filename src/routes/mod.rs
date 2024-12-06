@@ -14,3 +14,5 @@ pub mod session;
 pub mod user;
 pub mod validate;
 pub mod forgot;
+pub mod login_passkey;
+pub mod register_passkey;

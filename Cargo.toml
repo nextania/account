@@ -1,5 +1,5 @@
 [package]
-name = "sso-system"
+name = "account-services"
 version = "0.1.0"
 edition = "2021"
 
@@ -37,6 +37,6 @@ ulid = "1.1.2"
 lettre = { version = "0.11", features = ["async-std1", "async-std1-rustls-tls", "builder", "smtp-transport"], default-features = false }
 
 totp-rs = { version = "5.5.1", features = ["qr"] }
-passkey = "0.3.0"
-opaque-ke = "3.0.0-pre.4"
+opaque-ke = "3.0.0-pre.5"
 dotenvy = "0.15.7"
+webauthn-rs = "0.5.0"

@@ -37,6 +37,9 @@ Before running, you should populate the environment variables with the following
 * `HCAPTCHA_SECRET`: A secret from hCaptcha to verify hCaptcha tokens.
 * `CORS_ORIGINS`: A list of origins to allow CORS requests from, separated by commas.
 * `HOST`: The host to bind the server to.
+* `PUBLIC_ROOT`: The outward-facing domain name (including port, if non-standard).
+* `SERVICE_NAME`: The outward-facing name of the service.
+* `RP_ID`: The domain name that passkeys are authorized to.
 * `SMTP_SERVER`: The SMTP server to send from.
 * `SMTP_USERNAME`: The username to use with the SMTP server.
 * `SMTP_PASSWORD`: The password to use with the SMTP server.

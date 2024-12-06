@@ -8,5 +8,5 @@ RUN apt update && apt install -y libssl-dev pkg-config && cargo install --locked
 FROM debian:bookworm-slim
 WORKDIR /usr/app
 RUN apt update && apt install -y ca-certificates
-COPY --from=builder /usr/local/cargo/bin/sso-system ./
-CMD ["./sso-system"]
+COPY --from=builder /usr/local/cargo/bin/account-services ./
+CMD ["./account-services"]

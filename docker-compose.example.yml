@@ -5,18 +5,21 @@ networks:
     name: nextflow
 
 services:
-  sso-system:
+  account-services:
     build: .
     environment:
-      - MONGODB_URI=mongodb://sso-system-mongodb:27017
-      - MONGODB_DATABASE=sso
+      - MONGODB_URI=mongodb://account-services-mongodb:27017
+      - MONGODB_DATABASE=accounts
       - CDN_MONGODB_DATABASE=cdn
       - JWT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       - HCAPTCHA_SECRET=0x0000000000000000000000000000000000000000
       - CORS_ORIGINS=https://www.example.com
       - HOST=0.0.0.0:9000
+      - PUBLIC_ROOT=https://www.example.com
+      - SERVICE_NAME=Example
+      - RP_ID=example.com
     restart: always
-  sso-system-mongodb:
+  account-services-mongodb:
     image: mongo
     volumes: ./database:/data/db
     restart: always

@@ -15,11 +15,11 @@ pub struct CurrentUserResponse {
     id: String,
     username: String,
     mfa_enabled: bool,
-    public_email: bool,
     display_name: String,
     description: String,
     website: String,
-    avatar: String,
+    // TODO: avatar
+    avatar: Option<String>,
 }
 
 pub async fn handle(jwt: web::ReqData<Result<Authenticate>>) -> Result<impl Responder> {
@@ -44,7 +44,6 @@ pub async fn handle(jwt: web::ReqData<Result<Authenticate>>) -> Result<impl Resp
         display_name: profile_result.display_name,
         id: jwt.jwt_content.id,
         mfa_enabled: result.mfa_enabled,
-        public_email: result.public_email,
         username: result.username,
         website: profile_result.website,
     }))

@@ -8,11 +8,10 @@ static COLLECTION: OnceCell<Collection<User>> = OnceCell::new();
 pub struct User {
     pub id: String,
     pub email: String,
-    pub password_hash: String,
+    pub password_data: Vec<u8>,
     pub username: String,
     pub mfa_enabled: bool,
     pub mfa_secret: Option<String>,
-    pub public_email: bool,
     pub platform_administrator: bool,
     // Recovery email, client-encrypted keys?
 }
