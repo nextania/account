@@ -43,16 +43,15 @@ pub enum Login {
 }
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "camelCase", untagged)]
 pub enum LoginResponse {
     BeginLogin {
         continue_token: String,
         message: RequestChallengeResponse,
-    } = 1,
+    },
     FinishLogin {
         token: String,
-    } = 2,
+    },
 }
 
 pub struct PendingLogin {

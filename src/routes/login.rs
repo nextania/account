@@ -44,21 +44,20 @@ pub enum Login {
 }
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "camelCase", untagged)]
 pub enum LoginResponse {
     BeginLogin {
         continue_token: String,
         message: Vec<u8>,
-    } = 1,
+    },
     FinishLogin {
         mfa_enabled: bool,
         continue_token: Option<String>,
         token: Option<String>,
-    } = 2,
+    },
     Mfa {
         token: String,
-    } = 3,
+    },
 }
 
 pub struct PendingLogin {

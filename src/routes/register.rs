@@ -50,24 +50,23 @@ pub enum Register {
 }
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[repr(i8)]
+#[serde(rename_all = "camelCase", untagged)]
 pub enum RegisterResponse {
     // err
     VerifyEmail {
         // if email server disabled, then directly send continue token
         email_enabled: bool,
         email_token: Option<String>,
-    } = 1,
+    },
     BeginRegistration {
         continue_token: String,
         message: Vec<u8>,
         // opaque data
-    } = 2,
+    },
     Register {
         token: String,
         // opaque data 2
-    } = 3,
+    },
 }
 
 pub struct PendingRegister {

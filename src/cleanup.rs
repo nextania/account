@@ -35,9 +35,14 @@ pub fn run() {
             mfa::PENDING_MFA_SETUPS.remove(pending.key());
         }
     }
-    for pending in forgot::PENDING_FORGOTS.iter() {
+    for pending in forgot::PENDING_FORGOTS1.iter() {
         if now - pending.value().time > CONTINUE_TIMEOUT {
-            forgot::PENDING_FORGOTS.remove(pending.key());
+            forgot::PENDING_FORGOTS1.remove(pending.key());
+        }
+    }
+    for pending in forgot::PENDING_FORGOTS2.iter() {
+        if now - pending.value().time > CONTINUE_TIMEOUT {
+            forgot::PENDING_FORGOTS2.remove(pending.key());
         }
     }
 }

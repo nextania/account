@@ -1,49 +1,60 @@
 use actix_web::{web, Responder};
 use async_std::task;
-use bcrypt::{hash, DEFAULT_COST};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
-use mongodb::bson::doc;
+use mongodb::bson::{self, doc, Binary};
+use opaque_ke::{RegistrationRequest, RegistrationUpload};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    errors::{Error, Result},
-    utilities::{generate_continue_token_long, send_reset_email},
+    errors::{Error, Result}, opaque::{begin_registration, finish_registration}, utilities::{generate_continue_token_long, send_reset_email}
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Forgot {
-    stage: i8,
-    email: Option<String>,
-    new_password: Option<String>,
-    continue_token: Option<String>,
+#[serde(rename_all = "camelCase", tag = "stage")]
+#[repr(i8)]
+pub enum Forgot {
+    VerifyEmail {
+        email: String,
+    } = 1,
+    ResetPassword {
+        continue_token: String,
+        message: Vec<u8>,
+    } = 2,
+    FinishReset {
+        continue_token: String,
+        message: Vec<u8>,
+    } = 3,
 }
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForgotResponse {
-    success: bool,
+#[serde(rename_all = "camelCase", untagged)]
+pub enum ForgotResponse {
+    VerifyEmail {},
+    ResetPassword {
+        continue_token: String,
+        message: Vec<u8>,
+    },
+    FinishReset {},
 }
 
 pub struct PendingForgot {
     pub time: u64,
     pub user_id: String,
+    pub email: String,
 }
 
 lazy_static! {
-    pub static ref PENDING_FORGOTS: DashMap<String, PendingForgot> = DashMap::new();
+    pub static ref PENDING_FORGOTS1: DashMap<String, PendingForgot> = DashMap::new();
+    pub static ref PENDING_FORGOTS2: DashMap<String, PendingForgot> = DashMap::new();
 }
 
 pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
     let forgot = forgot.into_inner();
-    match forgot.stage {
-        1 => {
+    match forgot {
+        Forgot::VerifyEmail { email } => {
             let collection = crate::database::user::get_collection();
-            let Some(email) = forgot.email else {
-                return Err(Error::MissingEmail);
-            };
             let result = collection
                 .find_one(doc! {
                     "email": email.clone()
@@ -55,21 +66,19 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
                     .expect("Unexpected error: time went backwards");
                 let token = generate_continue_token_long();
                 task::spawn(send_reset_email(email.clone(), token.clone()));
-                PENDING_FORGOTS.insert(
+                PENDING_FORGOTS1.insert(
                     token,
                     PendingForgot {
                         time: duration.as_secs(),
                         user_id: result.id,
+                        email,
                     },
                 );
             }
-            Ok(web::Json(ForgotResponse { success: true }))
+            Ok(web::Json(ForgotResponse::VerifyEmail {}))
         }
-        2 => {
-            let Some(continue_token) = forgot.continue_token else {
-                return Err(Error::MissingContinueToken);
-            };
-            let forgot_session = PENDING_FORGOTS.get(&continue_token);
+        Forgot::ResetPassword { continue_token, message } => {
+            let forgot_session = PENDING_FORGOTS1.get(&continue_token);
             let Some(forgot_session) = forgot_session else {
                 return Err(Error::SessionExpired);
             };
@@ -78,31 +87,59 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
                 .expect("Unexpected error: time went backwards");
             if duration.as_secs() - forgot_session.time > 3600 {
                 drop(forgot_session);
-                PENDING_FORGOTS.remove(&continue_token);
+                PENDING_FORGOTS1.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let Some(password) = forgot.new_password else {
-                return Err(Error::MissingPassword);
+            let result = begin_registration(
+                forgot_session.email.clone(),
+                RegistrationRequest::deserialize(&message)?,
+            )
+            .await?;
+            PENDING_FORGOTS1.remove(&continue_token);
+            let new_continue_token = generate_continue_token_long();
+            PENDING_FORGOTS2.insert(
+                new_continue_token.clone(),
+                PendingForgot {
+                    time: duration.as_secs(),
+                    user_id: forgot_session.user_id.clone(),
+                    email: forgot_session.email.clone(),
+                },
+            );
+            drop(forgot_session);
+            Ok(web::Json(ForgotResponse::ResetPassword { continue_token: new_continue_token.clone(), message: result }))
+        }
+        Forgot::FinishReset { continue_token, message } => {
+            let Some(session) = PENDING_FORGOTS2.get(&continue_token) else {
+                return Err(Error::SessionExpired);
             };
-            let new_password_hash =
-                hash(password, DEFAULT_COST).expect("Unexpected error: failed to hash");
+            let duration = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Unexpected error: time went backwards")
+                .as_secs();
+            if duration - session.time > 600 {
+                PENDING_FORGOTS2.remove(&continue_token);
+                return Err(Error::SessionExpired);
+            }
+            let password_data =
+                finish_registration(RegistrationUpload::deserialize(&message)?)?;
+            let bin = Binary {
+                bytes: password_data,
+                subtype: bson::spec::BinarySubtype::Generic,
+            };
             let collection = crate::database::user::get_collection();
             collection
                 .update_one(
                     doc! {
-                        "id": forgot_session.user_id.clone()
+                        "id": session.user_id.clone()
                     },
                     doc! {
                         "$set": {
-                            "password_hash": new_password_hash
+                            "password_data": bin
                         }
                     },
                 )
                 .await?;
-            drop(forgot_session);
-            PENDING_FORGOTS.remove(&continue_token);
-            Ok(web::Json(ForgotResponse { success: true }))
+            Ok(web::Json(ForgotResponse::FinishReset {}))
         }
-        _ => Err(Error::InvalidStage),
     }
 }

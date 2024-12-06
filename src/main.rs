@@ -1,3 +1,4 @@
+#![allow(clippy::large_enum_variant)]
 use std::time::Duration;
 
 use actix_cors::Cors;
