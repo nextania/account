@@ -119,6 +119,18 @@ async fn main() {
                         web::post().to(routes::register_passkey::handle),
                     )
                     .route(
+                        "/user/passkeys",
+                        web::delete().to(routes::delete_passkey::handle),
+                    )
+                    .route(
+                        "/user/passkeys",
+                        web::get().to(routes::get_passkey::handle),
+                    )
+                    .route(
+                        "/user/password",
+                        web::patch().to(routes::update_password::handle),
+                    )
+                    .route(
                         "/validate",
                         web::post()
                             .to(routes::validate::handle)

@@ -55,7 +55,7 @@ pub async fn handle(
             })
             .await?;
         if user.is_some() {
-            return Err(Error::InvalidEmail);
+            return Err(Error::UserExists);
         }
         update_query.insert("email", email);
     }

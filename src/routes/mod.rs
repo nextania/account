@@ -16,3 +16,6 @@ pub mod service;
 pub mod session;
 pub mod user;
 pub mod validate;
+pub mod get_passkey;
+pub mod delete_passkey;
+pub mod update_password;

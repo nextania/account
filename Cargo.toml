@@ -26,7 +26,7 @@ actix-cors = "0.7.0"
 actix-files = "0.6.6"
 actix-extensible-rate-limit = "0.4.0"
 
-reqwest = "0.12.9   "
+reqwest = "0.12.9"
 serde = "1.0.215"
 serde_json = "1.0.133"
 

@@ -132,13 +132,13 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                     "credential_id": bin
                 })
                 .await?
-                .ok_or(Error::UserNotFound)?;
+                .ok_or(Error::CredentialError)?;
             let user = database::user::get_collection()
                 .find_one(doc! {
                     "id": passkey.user_id.clone()
                 })
                 .await?
-                .ok_or(Error::UserNotFound)?;
+                .ok_or(Error::CredentialError)?;
             if let Some(s) = &pending_login.existing_session {
                 if user.id != s.user_id {
                     return Err(Error::UserMismatch);

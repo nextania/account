@@ -11,30 +11,24 @@ use webauthn_rs::prelude::WebauthnError;
 pub enum Error {
     MissingToken,
     InvalidToken,
-    BadCrypto,
-    UserMismatch,
-
+    
     DatabaseError,
-
+    
     InvalidUsername,
     UsernameAlreadyTaken,
-    UserNotFound,
+    UserNotFound, 
     UserExists,
+    UserMismatch,
 
-    MissingEmail,
     InvalidEmail,
-    MissingPassword,
-    MissingCode,
     DisplayNameTooLong,
     DescriptionTooLong,
     WebsiteTooLong,
 
-    IncorrectCredentials,
+    CredentialError,
     IncorrectCode,
 
-    MissingContinueToken,
-    SessionExpired,
-    InvalidStage,
+    SessionExpired, 
 
     IpMissing,
 
@@ -64,30 +58,24 @@ impl ResponseError for Error {
         match self {
             Error::MissingToken => actix_web::http::StatusCode::UNAUTHORIZED,
             Error::InvalidToken => actix_web::http::StatusCode::UNAUTHORIZED,
-            Error::BadCrypto => actix_web::http::StatusCode::BAD_REQUEST,
-            Error::UserMismatch => actix_web::http::StatusCode::UNAUTHORIZED,
-
+            
             Error::DatabaseError => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-
+            
             Error::InvalidUsername => actix_web::http::StatusCode::BAD_REQUEST,
             Error::UsernameAlreadyTaken => actix_web::http::StatusCode::CONFLICT,
             Error::UserNotFound => actix_web::http::StatusCode::NOT_FOUND,
             Error::UserExists => actix_web::http::StatusCode::CONFLICT,
-
-            Error::MissingEmail => actix_web::http::StatusCode::BAD_REQUEST,
+            Error::UserMismatch => actix_web::http::StatusCode::UNAUTHORIZED,
+            
             Error::InvalidEmail => actix_web::http::StatusCode::BAD_REQUEST,
-            Error::MissingPassword => actix_web::http::StatusCode::BAD_REQUEST,
-            Error::MissingCode => actix_web::http::StatusCode::BAD_REQUEST,
             Error::DisplayNameTooLong => actix_web::http::StatusCode::BAD_REQUEST,
             Error::DescriptionTooLong => actix_web::http::StatusCode::BAD_REQUEST,
             Error::WebsiteTooLong => actix_web::http::StatusCode::BAD_REQUEST,
-
-            Error::IncorrectCredentials => actix_web::http::StatusCode::UNAUTHORIZED,
+            
+            Error::CredentialError => actix_web::http::StatusCode::UNAUTHORIZED,
             Error::IncorrectCode => actix_web::http::StatusCode::UNAUTHORIZED,
 
-            Error::MissingContinueToken => actix_web::http::StatusCode::BAD_REQUEST,
             Error::SessionExpired => actix_web::http::StatusCode::UNAUTHORIZED,
-            Error::InvalidStage => actix_web::http::StatusCode::BAD_REQUEST,
 
             Error::IpMissing => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
 
@@ -121,13 +109,13 @@ impl From<mongodb::error::Error> for Error {
 
 impl From<ProtocolError> for Error {
     fn from(_: ProtocolError) -> Self {
-        Error::BadCrypto
+        Error::CredentialError
     }
 }
 
 impl From<WebauthnError> for Error {
     fn from(_: WebauthnError) -> Self {
-        Error::BadCrypto
+        Error::CredentialError
     }
 }
 

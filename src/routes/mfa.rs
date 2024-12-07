@@ -162,7 +162,7 @@ pub async fn handle(
                 PENDING_MFA_SETUPS.remove(&continue_token);
                 Ok(web::Json(MfaResponse::EnableVerify {}))
             } else {
-                Err(Error::InvalidToken)
+                Err(Error::SessionExpired)
             }
         }
     }

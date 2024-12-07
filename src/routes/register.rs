@@ -11,15 +11,10 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{
-    authenticate::UserJwt,
-    database::{profile::UserProfile, session::Session, user::User},
-    environment::{JWT_SECRET, SMTP_ENABLED},
-    errors::{Error, Result},
-    opaque::{begin_registration, finish_registration},
-    utilities::{
+    authenticate::UserJwt, constants::{LONG_SESSION, SHORT_SESSION}, database::{profile::UserProfile, session::Session, user::User}, environment::{JWT_SECRET, SMTP_ENABLED}, errors::{Error, Result}, opaque::{begin_registration, finish_registration}, utilities::{
         generate_codes, generate_continue_token_long, send_in_use_email, send_verify_email,
         validate_captcha, EMAIL_RE, USERNAME_RE,
-    },
+    }
 };
 
 #[derive(Deserialize, Serialize)]
@@ -156,7 +151,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                     message: result,
                 }));
             }
-            Err(Error::InvalidToken)
+            Err(Error::SessionExpired)
         }
         Register::Register {
             friendly_name,
@@ -180,6 +175,15 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 }
                 if !USERNAME_RE.is_match(username.trim()) {
                     return Err(Error::InvalidUsername);
+                }
+                let collection = crate::database::user::get_collection();
+                let user = collection
+                    .find_one(doc! {
+                        "username": username.trim()
+                    })
+                    .await?;
+                if user.is_some() {
+                    return Err(Error::UsernameAlreadyTaken);
                 }
                 let password_data =
                     finish_registration(RegistrationUpload::deserialize(&message)?)?;
@@ -210,9 +214,9 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 let persist = persist.unwrap_or(false);
                 let millis = duration.as_millis();
                 let expires_at = if persist {
-                    millis + 2592000000
+                    millis + LONG_SESSION
                 } else {
-                    millis + 604800000
+                    millis + SHORT_SESSION
                 };
                 let jwt_object = UserJwt {
                     id: user_id.clone(),
@@ -237,7 +241,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 PENDING_REGISTERS2.remove(&token);
                 return Ok(web::Json(RegisterResponse::Register { token }));
             }
-            Err(Error::InvalidToken)
+            Err(Error::SessionExpired)
         }
     }
 }

@@ -72,7 +72,7 @@ pub async fn handle(
                     "id": user_id.clone()
                 })
                 .await?
-                .ok_or(Error::UserNotFound)?;
+                .ok_or(Error::DatabaseError)?;
             let uuid = webauthn_rs::prelude::Uuid::from_bytes(
                 Ulid::from_string(&user.id).expect("S").to_bytes(),
             );
