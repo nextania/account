@@ -217,10 +217,7 @@ pub async fn validate_escalation(
     let Some(escalate) = escalate else {
         return Err(Error::SessionExpired);
     };
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Unexpected error: time went backwards");
-    if duration.as_secs() - escalate.time > 3600 {
+    if get_time_secs() - escalate.time > 3600 {
         drop(escalate);
         login::ACTIVE_ESCALATIONS.remove(&escalation_token);
         return Err(Error::SessionExpired);
@@ -243,4 +240,18 @@ pub async fn validate_escalation(
     }
 
     Ok(escalate.user_id.clone())
+}
+
+pub fn get_time() -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Unexpected error: time went backwards")
+}
+
+pub fn get_time_secs() -> u64 {
+    get_time().as_secs()
+}
+
+pub fn get_time_millis() -> u128 {
+    get_time().as_millis()
 }

@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     authenticate::Authenticate,
     database::{files::File, passkey, profile, session, user},
-    errors::{Error, Result}, utilities::validate_escalation,
+    errors::{Error, Result},
+    utilities::validate_escalation,
 };
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +19,10 @@ pub struct Delete {
 pub struct DeleteResponse {}
 
 // TODO: security concerns? potentially add a grace period
-pub async fn handle(jwt: web::ReqData<Result<Authenticate>>, delete: web::Json<Delete>) -> Result<impl Responder> {
+pub async fn handle(
+    jwt: web::ReqData<Result<Authenticate>>,
+    delete: web::Json<Delete>,
+) -> Result<impl Responder> {
     let jwt = jwt.into_inner()?;
     validate_escalation(delete.escalation_token.clone(), jwt.jwt).await?;
     let collection = user::get_collection();

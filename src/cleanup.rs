@@ -1,15 +1,11 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::{
     constants::CONTINUE_TIMEOUT,
-    routes::{forgot, login, mfa, register},
+    routes::{forgot, login, mfa, register, update_password},
+    utilities::get_time_secs,
 };
 
 pub fn run() {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Unexpected error: failed to get system time")
-        .as_secs();
+    let now = get_time_secs();
     for pending in login::PENDING_LOGINS.iter() {
         if now - pending.value().time > CONTINUE_TIMEOUT {
             login::PENDING_LOGINS.remove(pending.key());
@@ -43,6 +39,11 @@ pub fn run() {
     for pending in forgot::PENDING_FORGOTS2.iter() {
         if now - pending.value().time > CONTINUE_TIMEOUT {
             forgot::PENDING_FORGOTS2.remove(pending.key());
+        }
+    }
+    for pending in update_password::PENDING_UPDATES.iter() {
+        if now - pending.value().time > CONTINUE_TIMEOUT {
+            update_password::PENDING_UPDATES.remove(pending.key());
         }
     }
 }

@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use actix_web::{web, Responder};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
@@ -15,7 +13,7 @@ use crate::{
     },
     environment::SERVICE_NAME,
     errors::{Error, Result},
-    utilities::{generate_codes, random_number, validate_escalation},
+    utilities::{generate_codes, get_time_secs, random_number, validate_escalation},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -103,12 +101,9 @@ pub async fn handle(
                     .get_qr_base64()
                     .expect("Unexpected error: failed to generate QR code");
                 let continue_token = ulid::Ulid::new().to_string();
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards");
                 let code = Secret::Raw(secret.to_vec()).to_encoded().to_string();
                 let session = PendingMfaSetup {
-                    time: duration.as_secs(),
+                    time: get_time_secs(),
                     user,
                     secret: code.clone(),
                     totp,
@@ -129,10 +124,7 @@ pub async fn handle(
         } => {
             let enable_session = PENDING_MFA_SETUPS.get(&continue_token);
             if let Some(enable_session) = enable_session {
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards");
-                if duration.as_secs() - enable_session.time > 3600 {
+                if get_time_secs() - enable_session.time > 3600 {
                     drop(enable_session);
                     PENDING_MFA_SETUPS.remove(&continue_token);
                     return Err(Error::SessionExpired);

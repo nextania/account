@@ -6,7 +6,6 @@ use dashmap::DashMap;
 use lazy_static::lazy_static;
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use ulid::Ulid;
 use webauthn_rs::{
     prelude::{CreationChallengeResponse, PasskeyRegistration, RegisterPublicKeyCredential},
@@ -20,7 +19,7 @@ use crate::{
         user::User,
     },
     errors::{Error, Result},
-    utilities::{generate_continue_token_long, validate_escalation},
+    utilities::{generate_continue_token_long, get_time_secs, validate_escalation},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -79,11 +78,8 @@ pub async fn handle(
             let (ccr, reg_state) =
                 webauthn.start_passkey_registration(uuid, &user.username, &user.username, None)?;
             let continue_token = generate_continue_token_long();
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
             let pending_register = PendingRegister {
-                time: duration.as_secs(),
+                time: get_time_secs(),
                 email: user.username.clone(),
                 user,
                 data: reg_state,
@@ -103,10 +99,7 @@ pub async fn handle(
             let Some(pending_register) = pending_register else {
                 return Err(Error::SessionExpired);
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            if duration.as_secs() - pending_register.time > 3600 {
+            if get_time_secs() - pending_register.time > 3600 {
                 drop(pending_register);
                 PENDING_REGISTERS.remove(&continue_token);
                 return Err(Error::SessionExpired);

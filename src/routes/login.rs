@@ -5,7 +5,6 @@ use lazy_static::lazy_static;
 use mongodb::bson::doc;
 use opaque_ke::{CredentialFinalization, CredentialRequest, ServerLogin};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use totp_rs::{Algorithm, Secret, TOTP};
 use ulid::Ulid;
 
@@ -16,7 +15,7 @@ use crate::{
     environment::JWT_SECRET,
     errors::{Error, Result},
     opaque::{begin_login, finish_login, Default},
-    utilities::generate_continue_token_long,
+    utilities::{generate_continue_token_long, get_time_millis, get_time_secs},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -127,12 +126,9 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             )
             .await?;
             let continue_token = generate_continue_token_long();
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
             if let Some(user) = user {
                 let pending_login = PendingLogin {
-                    time: duration.as_secs(),
+                    time: get_time_secs(),
                     user,
                     email,
                     data: state,
@@ -156,10 +152,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 Some(pending_login) => pending_login,
                 None => return Err(Error::SessionExpired),
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            if duration.as_secs() - pending_login.time > 3600 {
+            if get_time_secs() - pending_login.time > 3600 {
                 drop(pending_login);
                 PENDING_LOGINS.remove(&continue_token);
                 return Err(Error::SessionExpired);
@@ -171,11 +164,8 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             let user = pending_login.user.clone();
             if user.mfa_enabled {
                 let new_continue_token = generate_continue_token_long();
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards");
                 let mfa_session = PendingMfa {
-                    time: duration.as_secs(),
+                    time: get_time_secs(),
                     user,
                     email: pending_login.email.clone(),
                     persist,
@@ -192,7 +182,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 }))
             } else {
                 let persist = persist.unwrap_or(false);
-                let millis = duration.as_millis();
+                let millis = get_time_millis();
                 let expires_at = if persist {
                     millis + LONG_SESSION
                 } else {
@@ -213,7 +203,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                         token.clone(),
                         ActiveEscalation {
                             session_id: existing_session.id.clone(),
-                            time: duration.as_secs(),
+                            time: get_time_secs(),
                             token: token.clone(),
                             user_id: user.id.clone(),
                         },
@@ -246,10 +236,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             let Some(mfa_session) = mfa_session else {
                 return Err(Error::SessionExpired);
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            if duration.as_secs() - mfa_session.time > 3600 {
+            if get_time_secs() - mfa_session.time > 3600 {
                 drop(mfa_session);
                 PENDING_MFAS.remove(&continue_token);
                 return Err(Error::SessionExpired);
@@ -287,7 +274,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                     .await?;
             }
             let persist = mfa_session.persist.unwrap_or(false);
-            let millis = duration.as_millis();
+            let millis = get_time_millis();
             let expires_at = if persist {
                 millis + 2592000000
             } else {
@@ -309,7 +296,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                     token.clone(),
                     ActiveEscalation {
                         session_id: existing_session.id.clone(),
-                        time: duration.as_secs(),
+                        time: get_time_secs(),
                         token: token.clone(),
                         user_id: id.clone(),
                     },

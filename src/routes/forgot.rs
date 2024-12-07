@@ -5,10 +5,11 @@ use lazy_static::lazy_static;
 use mongodb::bson::{self, doc, Binary};
 use opaque_ke::{RegistrationRequest, RegistrationUpload};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    errors::{Error, Result}, opaque::{begin_registration, finish_registration}, utilities::{generate_continue_token_long, send_reset_email}
+    errors::{Error, Result},
+    opaque::{begin_registration, finish_registration},
+    utilities::{generate_continue_token_long, get_time_secs, send_reset_email},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -61,15 +62,12 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
                 })
                 .await?;
             if let Some(result) = result {
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards");
                 let token = generate_continue_token_long();
                 task::spawn(send_reset_email(email.clone(), token.clone()));
                 PENDING_FORGOTS1.insert(
                     token,
                     PendingForgot {
-                        time: duration.as_secs(),
+                        time: get_time_secs(),
                         user_id: result.id,
                         email,
                     },
@@ -77,15 +75,15 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
             }
             Ok(web::Json(ForgotResponse::VerifyEmail {}))
         }
-        Forgot::ResetPassword { continue_token, message } => {
+        Forgot::ResetPassword {
+            continue_token,
+            message,
+        } => {
             let forgot_session = PENDING_FORGOTS1.get(&continue_token);
             let Some(forgot_session) = forgot_session else {
                 return Err(Error::SessionExpired);
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            if duration.as_secs() - forgot_session.time > 3600 {
+            if get_time_secs() - forgot_session.time > 3600 {
                 drop(forgot_session);
                 PENDING_FORGOTS1.remove(&continue_token);
                 return Err(Error::SessionExpired);
@@ -100,28 +98,29 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
             PENDING_FORGOTS2.insert(
                 new_continue_token.clone(),
                 PendingForgot {
-                    time: duration.as_secs(),
+                    time: get_time_secs(),
                     user_id: forgot_session.user_id.clone(),
                     email: forgot_session.email.clone(),
                 },
             );
             drop(forgot_session);
-            Ok(web::Json(ForgotResponse::ResetPassword { continue_token: new_continue_token.clone(), message: result }))
+            Ok(web::Json(ForgotResponse::ResetPassword {
+                continue_token: new_continue_token.clone(),
+                message: result,
+            }))
         }
-        Forgot::FinishReset { continue_token, message } => {
+        Forgot::FinishReset {
+            continue_token,
+            message,
+        } => {
             let Some(session) = PENDING_FORGOTS2.get(&continue_token) else {
                 return Err(Error::SessionExpired);
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards")
-                .as_secs();
-            if duration - session.time > 600 {
+            if get_time_secs() - session.time > 600 {
                 PENDING_FORGOTS2.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let password_data =
-                finish_registration(RegistrationUpload::deserialize(&message)?)?;
+            let password_data = finish_registration(RegistrationUpload::deserialize(&message)?)?;
             let bin = Binary {
                 bytes: password_data,
                 subtype: bson::spec::BinarySubtype::Generic,

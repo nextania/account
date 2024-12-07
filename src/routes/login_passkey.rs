@@ -7,7 +7,6 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
 use mongodb::bson::{self, doc, Binary};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use ulid::Ulid;
 use webauthn_rs::{
     prelude::{PasskeyAuthentication, PublicKeyCredential, RequestChallengeResponse},
@@ -20,7 +19,7 @@ use crate::{
     database::{self, passkey::get_collection, session::Session},
     environment::JWT_SECRET,
     errors::{Error, Result},
-    utilities::generate_continue_token_long,
+    utilities::{generate_continue_token_long, get_time_millis, get_time_secs},
 };
 
 use super::login::{ActiveEscalation, ACTIVE_ESCALATIONS};
@@ -85,13 +84,10 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
             };
             let (rcr, auth_state) = webauthn.start_passkey_authentication(&[])?;
             let continue_token = generate_continue_token_long();
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
             PENDING_LOGINS.insert(
                 continue_token.clone(),
                 PendingLogin {
-                    time: duration.as_secs(),
+                    time: get_time_secs(),
                     data: auth_state,
                     existing_session,
                 },
@@ -112,10 +108,7 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                 Some(pending_login) => pending_login,
                 None => return Err(Error::SessionExpired),
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            if duration.as_secs() - pending_login.time > 3600 {
+            if get_time_secs() - pending_login.time > 3600 {
                 drop(pending_login);
                 PENDING_LOGINS.remove(&continue_token);
                 return Err(Error::SessionExpired);
@@ -145,7 +138,7 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                 }
             }
             let persist = persist.unwrap_or(false);
-            let millis = duration.as_millis();
+            let millis = get_time_millis();
             let expires_at = if persist {
                 millis + LONG_SESSION
             } else {
@@ -166,7 +159,7 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                     token.clone(),
                     ActiveEscalation {
                         session_id: existing_session.id.clone(),
-                        time: duration.as_secs(),
+                        time: get_time_secs(),
                         token: token.clone(),
                         user_id: user.id.clone(),
                     },

@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use actix_web::{web, Responder};
 use async_std::task;
 use dashmap::DashMap;
@@ -11,10 +9,16 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{
-    authenticate::UserJwt, constants::{LONG_SESSION, SHORT_SESSION}, database::{profile::UserProfile, session::Session, user::User}, environment::{JWT_SECRET, SMTP_ENABLED}, errors::{Error, Result}, opaque::{begin_registration, finish_registration}, utilities::{
-        generate_codes, generate_continue_token_long, send_in_use_email, send_verify_email,
-        validate_captcha, EMAIL_RE, USERNAME_RE,
-    }
+    authenticate::UserJwt,
+    constants::{LONG_SESSION, SHORT_SESSION},
+    database::{profile::UserProfile, session::Session, user::User},
+    environment::{JWT_SECRET, SMTP_ENABLED},
+    errors::{Error, Result},
+    opaque::{begin_registration, finish_registration},
+    utilities::{
+        generate_codes, generate_continue_token_long, get_time_millis, get_time_secs,
+        send_in_use_email, send_verify_email, validate_captcha, EMAIL_RE, USERNAME_RE,
+    },
 };
 
 #[derive(Deserialize, Serialize)]
@@ -100,10 +104,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                     PENDING_REGISTERS1.insert(
                         token,
                         PendingRegister {
-                            time: SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .expect("Unexpected error: time went backwards")
-                                .as_secs(),
+                            time: get_time_secs(),
                             email,
                         },
                     );
@@ -124,11 +125,8 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
         }
         Register::BeginRegistration { token, message } => {
             if let Some(session) = PENDING_REGISTERS1.get(&token) {
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards")
-                    .as_secs();
-                if duration - session.time > 600 {
+                let time = get_time_secs();
+                if time - session.time > 600 {
                     PENDING_REGISTERS1.remove(&token);
                     return Err(Error::SessionExpired);
                 }
@@ -142,7 +140,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 PENDING_REGISTERS2.insert(
                     continue_token.clone(),
                     PendingRegister {
-                        time: duration,
+                        time,
                         email: session.email.clone(),
                     },
                 );
@@ -162,11 +160,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
             token,
         } => {
             if let Some(session) = PENDING_REGISTERS2.get(&token) {
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards")
-                    .as_secs();
-                if duration - session.time > 600 {
+                if get_time_secs() - session.time > 600 {
                     PENDING_REGISTERS2.remove(&token);
                     return Err(Error::SessionExpired);
                 }
@@ -208,11 +202,8 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 user_collection.insert_one(user_document).await?;
                 let profile_collection = crate::database::profile::get_collection();
                 profile_collection.insert_one(profile_document).await?;
-                let duration = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Unexpected error: time went backwards");
                 let persist = persist.unwrap_or(false);
-                let millis = duration.as_millis();
+                let millis = get_time_millis();
                 let expires_at = if persist {
                     millis + LONG_SESSION
                 } else {

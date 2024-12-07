@@ -3,10 +3,7 @@ use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    authenticate::Authenticate,
-    database::passkey
-    ,
-    errors::Result, utilities::validate_escalation,
+    authenticate::Authenticate, database::passkey, errors::Result, utilities::validate_escalation,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -22,9 +19,11 @@ pub async fn handle(
 ) -> Result<impl Responder> {
     let jwt = jwt.into_inner()?;
     validate_escalation(delete_passkey.escalation_token.clone(), jwt.jwt).await?;
-    passkey::get_collection().delete_one(doc! {
-        "id": &delete_passkey.id,
-        "user_id": jwt.jwt_content.id,
-    }).await?;
+    passkey::get_collection()
+        .delete_one(doc! {
+            "id": &delete_passkey.id,
+            "user_id": jwt.jwt_content.id,
+        })
+        .await?;
     Ok(web::Json("null"))
 }

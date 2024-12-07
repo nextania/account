@@ -122,10 +122,7 @@ async fn main() {
                         "/user/passkeys",
                         web::delete().to(routes::delete_passkey::handle),
                     )
-                    .route(
-                        "/user/passkeys",
-                        web::get().to(routes::get_passkey::handle),
-                    )
+                    .route("/user/passkeys", web::get().to(routes::get_passkey::handle))
                     .route(
                         "/user/password",
                         web::patch().to(routes::update_password::handle),

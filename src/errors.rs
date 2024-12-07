@@ -11,12 +11,12 @@ use webauthn_rs::prelude::WebauthnError;
 pub enum Error {
     MissingToken,
     InvalidToken,
-    
+
     DatabaseError,
-    
+
     InvalidUsername,
     UsernameAlreadyTaken,
-    UserNotFound, 
+    UserNotFound,
     UserExists,
     UserMismatch,
 
@@ -28,7 +28,7 @@ pub enum Error {
     CredentialError,
     IncorrectCode,
 
-    SessionExpired, 
+    SessionExpired,
 
     IpMissing,
 
@@ -58,20 +58,20 @@ impl ResponseError for Error {
         match self {
             Error::MissingToken => actix_web::http::StatusCode::UNAUTHORIZED,
             Error::InvalidToken => actix_web::http::StatusCode::UNAUTHORIZED,
-            
+
             Error::DatabaseError => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-            
+
             Error::InvalidUsername => actix_web::http::StatusCode::BAD_REQUEST,
             Error::UsernameAlreadyTaken => actix_web::http::StatusCode::CONFLICT,
             Error::UserNotFound => actix_web::http::StatusCode::NOT_FOUND,
             Error::UserExists => actix_web::http::StatusCode::CONFLICT,
             Error::UserMismatch => actix_web::http::StatusCode::UNAUTHORIZED,
-            
+
             Error::InvalidEmail => actix_web::http::StatusCode::BAD_REQUEST,
             Error::DisplayNameTooLong => actix_web::http::StatusCode::BAD_REQUEST,
             Error::DescriptionTooLong => actix_web::http::StatusCode::BAD_REQUEST,
             Error::WebsiteTooLong => actix_web::http::StatusCode::BAD_REQUEST,
-            
+
             Error::CredentialError => actix_web::http::StatusCode::UNAUTHORIZED,
             Error::IncorrectCode => actix_web::http::StatusCode::UNAUTHORIZED,
 
