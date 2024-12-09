@@ -20,9 +20,7 @@ use crate::{
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Mfa {
     #[serde(rename_all = "camelCase")]
-    Toggle {
-        escalation_token: String,
-    },
+    Toggle { escalation_token: String },
     #[serde(rename_all = "camelCase")]
     EnableVerify {
         code: String,

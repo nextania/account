@@ -11,8 +11,7 @@ pub struct Validate {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidateResponse {
-}
+pub struct ValidateResponse {}
 
 pub async fn handle(validate: web::Json<Validate>) -> Result<impl Responder> {
     validate_token(&validate.token).await?;

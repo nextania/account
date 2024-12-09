@@ -9,7 +9,9 @@ use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 use webauthn_rs::{
-    prelude::{DiscoverableAuthentication, DiscoverableKey, PublicKeyCredential, RequestChallengeResponse},
+    prelude::{
+        DiscoverableAuthentication, DiscoverableKey, PublicKeyCredential, RequestChallengeResponse,
+    },
     Webauthn,
 };
 
@@ -120,7 +122,11 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                 })
                 .await?
                 .ok_or(Error::CredentialError)?;
-            webauthn.finish_discoverable_authentication(&message, pending_login.data.clone(), &[DiscoverableKey::from(passkey.credential)])?;
+            webauthn.finish_discoverable_authentication(
+                &message,
+                pending_login.data.clone(),
+                &[DiscoverableKey::from(passkey.credential)],
+            )?;
             let user = database::user::get_collection()
                 .find_one(doc! {
                     "id": passkey.user_id.clone()

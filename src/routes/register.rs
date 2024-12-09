@@ -135,7 +135,10 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 }))
             }
         }
-        Register::BeginRegistration { email_token: token, message } => {
+        Register::BeginRegistration {
+            email_token: token,
+            message,
+        } => {
             if let Some(session) = PENDING_REGISTERS1.get(&token) {
                 let time = get_time_secs();
                 if time - session.time > 600 {
@@ -152,13 +155,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 drop(session);
                 PENDING_REGISTERS1.remove(&token);
                 let continue_token = generate_continue_token_long();
-                PENDING_REGISTERS2.insert(
-                    continue_token.clone(),
-                    PendingRegister {
-                        time,
-                        email,
-                    },
-                );
+                PENDING_REGISTERS2.insert(continue_token.clone(), PendingRegister { time, email });
                 return Ok(web::Json(RegisterResponse::BeginRegistration {
                     continue_token,
                     message: BASE64.encode(result),
@@ -194,8 +191,9 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 if user.is_some() {
                     return Err(Error::UsernameAlreadyTaken);
                 }
-                let password_data =
-                    finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
+                let password_data = finish_registration(RegistrationUpload::deserialize(
+                    &BASE64.decode(message)?,
+                )?)?;
                 let user_id = Ulid::new().to_string();
                 let user_document = User {
                     id: user_id.clone(),

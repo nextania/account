@@ -27,9 +27,7 @@ use crate::{
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Register {
     #[serde(rename_all = "camelCase")]
-    BeginRegister {
-        escalation_token: String,
-    },
+    BeginRegister { escalation_token: String },
     #[serde(rename_all = "camelCase")]
     FinishRegister {
         message: RegisterPublicKeyCredential,
