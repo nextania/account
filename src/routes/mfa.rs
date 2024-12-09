@@ -17,21 +17,23 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(u8)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Mfa {
+    #[serde(rename_all = "camelCase")]
     Toggle {
         escalation_token: String,
-    } = 1,
+    },
+    #[serde(rename_all = "camelCase")]
     EnableVerify {
         code: String,
         continue_token: String,
-    } = 2,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum MfaResponse {
+    #[serde(rename_all = "camelCase")]
     Enable {
         continue_token: String,
         qr: String,

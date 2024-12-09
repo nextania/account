@@ -1,4 +1,4 @@
-pub const SERVICE: &str = "sso";
+pub const SERVICE: &str = "account";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const SHORT_SESSION: u128 = 604800000; // 7 days

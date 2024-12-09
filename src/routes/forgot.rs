@@ -13,26 +13,28 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Forgot {
     VerifyEmail {
         email: String,
-    } = 1,
+    },
+    #[serde(rename_all = "camelCase")]
     ResetPassword {
         continue_token: String,
         message: Vec<u8>,
-    } = 2,
+    },
+    #[serde(rename_all = "camelCase")]
     FinishReset {
         continue_token: String,
         message: Vec<u8>,
-    } = 3,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum ForgotResponse {
     VerifyEmail {},
+    #[serde(rename_all = "camelCase")]
     ResetPassword {
         continue_token: String,
         message: Vec<u8>,

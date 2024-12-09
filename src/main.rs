@@ -109,23 +109,23 @@ async fn main() {
                             .to(routes::register::handle)
                             .wrap(create_success_rate_limiter(Duration::from_secs(21600), 5)),
                     ) // 6 hours
-                    .route("/user/{id}", web::get().to(routes::user::handle))
-                    .route(
-                        "/session/passkeys",
-                        web::post().to(routes::login_passkey::handle),
-                    )
                     .route(
                         "/user/passkeys",
                         web::post().to(routes::register_passkey::handle),
                     )
                     .route(
-                        "/user/passkeys",
+                        "/user/passkeys/{id}",
                         web::delete().to(routes::delete_passkey::handle),
                     )
                     .route("/user/passkeys", web::get().to(routes::get_passkey::handle))
                     .route(
                         "/user/password",
                         web::patch().to(routes::update_password::handle),
+                    )
+                    .route("/user/{id}", web::get().to(routes::user::handle))
+                    .route(
+                        "/session/passkeys",
+                        web::post().to(routes::login_passkey::handle),
                     )
                     .route(
                         "/validate",

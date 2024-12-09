@@ -1,4 +1,5 @@
 use actix_web::{web, Responder};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as BASE64, Engine};
 use dashmap::DashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
@@ -12,43 +13,46 @@ use crate::{
     authenticate::UserJwt,
     constants::{LONG_SESSION, SHORT_SESSION},
     database::{self, session::Session, user::User},
-    environment::JWT_SECRET,
+    environment::{JWT_SECRET, SERVICE_NAME},
     errors::{Error, Result},
     opaque::{begin_login, finish_login, Default},
     utilities::{generate_continue_token_long, get_time_millis, get_time_secs},
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Login {
     BeginLogin {
         email: String,
-        message: Vec<u8>,
+        message: String,
 
         escalate: bool,
         // req'd if escalating an existing session
         token: Option<String>,
-    } = 1,
+    },
+    #[serde(rename_all = "camelCase")]
     FinishLogin {
-        message: Vec<u8>,
+        message: String,
         continue_token: String,
         persist: Option<bool>,
         friendly_name: Option<String>,
-    } = 2,
+    },
+    #[serde(rename_all = "camelCase")]
     Mfa {
         code: String,
         continue_token: String,
-    } = 3,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum LoginResponse {
+    #[serde(rename_all = "camelCase")]
     BeginLogin {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
     },
+    #[serde(rename_all = "camelCase")]
     FinishLogin {
         mfa_enabled: bool,
         continue_token: Option<String>,
@@ -122,7 +126,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             let (data, state) = begin_login(
                 email.clone(),
                 password_data,
-                CredentialRequest::deserialize(&message)?,
+                CredentialRequest::deserialize(&BASE64.decode(message)?)?,
             )
             .await?;
             let continue_token = generate_continue_token_long();
@@ -138,7 +142,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             }
             Ok(web::Json(LoginResponse::BeginLogin {
                 continue_token,
-                message: data,
+                message: BASE64.encode(data),
             }))
         }
         Login::FinishLogin {
@@ -159,7 +163,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
             }
             finish_login(
                 pending_login.data.clone(),
-                CredentialFinalization::deserialize(&message)?,
+                CredentialFinalization::deserialize(&BASE64.decode(message)?)?,
             )?;
             let user = pending_login.user.clone();
             if user.mfa_enabled {
@@ -249,7 +253,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 1,
                 30,
                 secret.to_bytes().unwrap(),
-                Some("Nextflow Cloud Technologies".to_string()),
+                Some(SERVICE_NAME.to_string()),
                 mfa_session.email.clone(),
             )
             .expect("Unexpected error: could not create TOTP instance");

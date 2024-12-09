@@ -6,9 +6,7 @@ use crate::{authenticate::Authenticate, database::session::get_collection, error
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LogoutOtherResponse {
-    success: bool,
-}
+pub struct LogoutOtherResponse {}
 
 pub async fn handle(
     jwt: web::ReqData<Result<Authenticate>>,
@@ -19,5 +17,5 @@ pub async fn handle(
     sessions
         .delete_one(doc! { "id": &logout_other.into_inner() })
         .await?;
-    Ok(web::Json(LogoutOtherResponse { success: true }))
+    Ok(web::Json(LogoutOtherResponse {}))
 }

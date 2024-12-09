@@ -13,6 +13,7 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct CurrentUserResponse {
     id: String,
+    email: String,
     username: String,
     mfa_enabled: bool,
     display_name: String,
@@ -43,6 +44,7 @@ pub async fn handle(jwt: web::ReqData<Result<Authenticate>>) -> Result<impl Resp
         description: profile_result.description,
         display_name: profile_result.display_name,
         id: jwt.jwt_content.id,
+        email: result.email,
         mfa_enabled: result.mfa_enabled,
         username: result.username,
         website: profile_result.website,

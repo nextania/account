@@ -1,5 +1,6 @@
 use actix_web::{web, Responder};
 use async_std::task;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as BASE64, Engine};
 use dashmap::DashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
@@ -22,44 +23,47 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Register {
+    #[serde(rename_all = "camelCase")]
     VerifyEmail {
         // stage 1: email & captcha
         email: String,
         captcha_token: String,
-    } = 1,
+    },
+    #[serde(rename_all = "camelCase")]
     BeginRegistration {
         // stage 2: email token, password registration begin
-        token: String,
+        email_token: String,
         // opaque data
-        message: Vec<u8>,
-    } = 2,
+        message: String,
+    },
+    #[serde(rename_all = "camelCase")]
     Register {
         // stage 3: password registration
         // opaque data 2
-        token: String,
-        message: Vec<u8>,
+        continue_token: String,
+        message: String,
         friendly_name: Option<String>,
         username: String,
         persist: Option<bool>,
         display_name: String,
-    } = 3,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum RegisterResponse {
-    // err
+    #[serde(rename_all = "camelCase")]
     VerifyEmail {
         // if email server disabled, then directly send continue token
         email_enabled: bool,
         email_token: Option<String>,
     },
+    #[serde(rename_all = "camelCase")]
     BeginRegistration {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
         // opaque data
     },
     Register {
@@ -117,36 +121,47 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                 if user.is_some() {
                     return Err(Error::UserExists);
                 }
+                let token = generate_continue_token_long();
+                PENDING_REGISTERS1.insert(
+                    token.clone(),
+                    PendingRegister {
+                        time: get_time_secs(),
+                        email,
+                    },
+                );
                 Ok(web::Json(RegisterResponse::VerifyEmail {
                     email_enabled: false,
-                    email_token: Some(generate_continue_token_long()),
+                    email_token: Some(token),
                 }))
             }
         }
-        Register::BeginRegistration { token, message } => {
+        Register::BeginRegistration { email_token: token, message } => {
             if let Some(session) = PENDING_REGISTERS1.get(&token) {
                 let time = get_time_secs();
                 if time - session.time > 600 {
+                    drop(session);
                     PENDING_REGISTERS1.remove(&token);
                     return Err(Error::SessionExpired);
                 }
+                let email = session.email.clone();
                 let result = begin_registration(
-                    session.email.clone(),
-                    RegistrationRequest::deserialize(&message)?,
+                    email.clone(),
+                    RegistrationRequest::deserialize(&BASE64.decode(message)?)?,
                 )
                 .await?;
+                drop(session);
                 PENDING_REGISTERS1.remove(&token);
                 let continue_token = generate_continue_token_long();
                 PENDING_REGISTERS2.insert(
                     continue_token.clone(),
                     PendingRegister {
                         time,
-                        email: session.email.clone(),
+                        email,
                     },
                 );
                 return Ok(web::Json(RegisterResponse::BeginRegistration {
                     continue_token,
-                    message: result,
+                    message: BASE64.encode(result),
                 }));
             }
             Err(Error::SessionExpired)
@@ -157,7 +172,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
             persist,
             display_name,
             message,
-            token,
+            continue_token: token,
         } => {
             if let Some(session) = PENDING_REGISTERS2.get(&token) {
                 if get_time_secs() - session.time > 600 {
@@ -180,7 +195,7 @@ pub async fn handle(register: web::Json<Register>) -> Result<impl Responder> {
                     return Err(Error::UsernameAlreadyTaken);
                 }
                 let password_data =
-                    finish_registration(RegistrationUpload::deserialize(&message)?)?;
+                    finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
                 let user_id = Ulid::new().to_string();
                 let user_document = User {
                     id: user_id.clone(),

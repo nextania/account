@@ -8,7 +8,7 @@ static COLLECTION: OnceCell<Collection<Passkey>> = OnceCell::new();
 pub struct Passkey {
     pub id: String,
     pub credential: webauthn_rs::prelude::Passkey,
-    pub credential_id: Vec<u8>,
+    pub credential_id: String,
     pub user_id: String,
     pub friendly_name: String,
 }

@@ -5,11 +5,11 @@ use actix_web::{
 use dashmap::DashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
-use mongodb::bson::{self, doc, Binary};
+use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 use webauthn_rs::{
-    prelude::{PasskeyAuthentication, PublicKeyCredential, RequestChallengeResponse},
+    prelude::{DiscoverableAuthentication, DiscoverableKey, PublicKeyCredential, RequestChallengeResponse},
     Webauthn,
 };
 
@@ -25,25 +25,26 @@ use crate::{
 use super::login::{ActiveEscalation, ACTIVE_ESCALATIONS};
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Login {
     BeginLogin {
         escalate: bool,
         // req'd if escalating an existing session
         token: Option<String>,
-    } = 1,
+    },
+    #[serde(rename_all = "camelCase")]
     FinishLogin {
         message: PublicKeyCredential,
         continue_token: String,
         persist: Option<bool>,
         friendly_name: Option<String>,
-    } = 2,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum LoginResponse {
+    #[serde(rename_all = "camelCase")]
     BeginLogin {
         continue_token: String,
         message: RequestChallengeResponse,
@@ -55,7 +56,7 @@ pub enum LoginResponse {
 
 pub struct PendingLogin {
     pub time: u64,
-    pub data: PasskeyAuthentication,
+    pub data: DiscoverableAuthentication,
     pub existing_session: Option<Session>,
 }
 
@@ -82,7 +83,7 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
             } else {
                 None
             };
-            let (rcr, auth_state) = webauthn.start_passkey_authentication(&[])?;
+            let (rcr, auth_state) = webauthn.start_discoverable_authentication()?;
             let continue_token = generate_continue_token_long();
             PENDING_LOGINS.insert(
                 continue_token.clone(),
@@ -113,19 +114,13 @@ pub async fn handle(login: web::Json<Login>, webauthn: Data<Webauthn>) -> Result
                 PENDING_LOGINS.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let auth_result =
-                webauthn.finish_passkey_authentication(&message, &pending_login.data)?;
-            let credential_id = auth_result.cred_id().as_ref();
-            let bin = Binary {
-                subtype: bson::spec::BinarySubtype::Generic,
-                bytes: credential_id.to_vec(),
-            };
             let passkey = get_collection()
                 .find_one(doc! {
-                    "credential_id": bin
+                    "credential_id": &message.id
                 })
                 .await?
                 .ok_or(Error::CredentialError)?;
+            webauthn.finish_discoverable_authentication(&message, pending_login.data.clone(), &[DiscoverableKey::from(passkey.credential)])?;
             let user = database::user::get_collection()
                 .find_one(doc! {
                     "id": passkey.user_id.clone()

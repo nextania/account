@@ -14,7 +14,6 @@ use crate::{
 pub struct UserResponse {
     id: String,
     username: String,
-    mfa_enabled: bool,
     display_name: String,
     description: String,
     website: String,
@@ -49,7 +48,6 @@ pub async fn handle(
         description: profile_result.description,
         display_name: profile_result.display_name,
         id: user_id.to_string(),
-        mfa_enabled: result.mfa_enabled,
         username: result.username,
         website: profile_result.website,
     }))

@@ -2,6 +2,7 @@ use actix_web::{
     web::{self, Data},
     Responder,
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as BASE64, Engine};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use mongodb::bson::doc;
@@ -23,22 +24,24 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "stage")]
-#[repr(i8)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
 pub enum Register {
+    #[serde(rename_all = "camelCase")]
     BeginRegister {
         escalation_token: String,
-    } = 1,
+    },
+    #[serde(rename_all = "camelCase")]
     FinishRegister {
         message: RegisterPublicKeyCredential,
         continue_token: String,
         friendly_name: Option<String>,
-    } = 2,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum RegisterResponse {
+    #[serde(rename_all = "camelCase")]
     BeginRegister {
         continue_token: String,
         message: CreationChallengeResponse,
@@ -112,7 +115,7 @@ pub async fn handle(
                 .insert_one(Passkey {
                     id: Ulid::new().to_string(),
                     credential: auth_result,
-                    credential_id,
+                    credential_id: BASE64.encode(credential_id),
                     user_id: user.id.clone(),
                     friendly_name: friendly_name.unwrap_or("Passkey".to_string()),
                 })

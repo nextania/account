@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use actix_web::ResponseError;
+use base64::DecodeError;
 use log::error;
 use opaque_ke::errors::ProtocolError;
 use serde::{Deserialize, Serialize};
@@ -115,6 +116,12 @@ impl From<ProtocolError> for Error {
 
 impl From<WebauthnError> for Error {
     fn from(_: WebauthnError) -> Self {
+        Error::CredentialError
+    }
+}
+
+impl From<DecodeError> for Error {
+    fn from(_: DecodeError) -> Self {
         Error::CredentialError
     }
 }
