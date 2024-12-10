@@ -1,5 +1,6 @@
 use actix_web::{web, Responder};
 use async_std::task;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as BASE64, Engine};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use mongodb::bson::{self, doc, Binary};
@@ -21,12 +22,12 @@ pub enum Forgot {
     #[serde(rename_all = "camelCase")]
     ResetPassword {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
     },
     #[serde(rename_all = "camelCase")]
     FinishReset {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
     },
 }
 
@@ -37,7 +38,7 @@ pub enum ForgotResponse {
     #[serde(rename_all = "camelCase")]
     ResetPassword {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
     },
     FinishReset {},
 }
@@ -92,7 +93,7 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
             }
             let result = begin_registration(
                 forgot_session.email.clone(),
-                RegistrationRequest::deserialize(&message)?,
+                RegistrationRequest::deserialize(&BASE64.decode(message)?)?,
             )
             .await?;
             PENDING_FORGOTS1.remove(&continue_token);
@@ -108,7 +109,7 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
             drop(forgot_session);
             Ok(web::Json(ForgotResponse::ResetPassword {
                 continue_token: new_continue_token.clone(),
-                message: result,
+                message: BASE64.encode(result),
             }))
         }
         Forgot::FinishReset {
@@ -122,7 +123,7 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
                 PENDING_FORGOTS2.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let password_data = finish_registration(RegistrationUpload::deserialize(&message)?)?;
+            let password_data = finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
             let bin = Binary {
                 bytes: password_data,
                 subtype: bson::spec::BinarySubtype::Generic,

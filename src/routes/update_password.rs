@@ -1,4 +1,5 @@
 use actix_web::{web, Responder};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as BASE64, Engine};
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use mongodb::bson::{self, doc, Binary};
@@ -18,12 +19,12 @@ pub enum UpdatePassword {
     #[serde(rename_all = "camelCase")]
     BeginUpdate {
         escalation_token: String,
-        message: Vec<u8>,
+        message: String,
     },
     #[serde(rename_all = "camelCase")]
     FinishUpdate {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
     },
 }
 
@@ -33,7 +34,7 @@ pub enum UpdatePasswordResponse {
     #[serde(rename_all = "camelCase")]
     BeginUpdate {
         continue_token: String,
-        message: Vec<u8>,
+        message: String,
     },
     FinishUpdate {},
 }
@@ -68,7 +69,7 @@ pub async fn handle(
                 .ok_or(Error::DatabaseError)?;
             let result = begin_registration(
                 user.email.clone(),
-                RegistrationRequest::deserialize(&message)?,
+                RegistrationRequest::deserialize(&BASE64.decode(message)?)?,
             )
             .await?;
             let continue_token = generate_continue_token_long();
@@ -81,7 +82,7 @@ pub async fn handle(
             );
             Ok(web::Json(UpdatePasswordResponse::BeginUpdate {
                 continue_token,
-                message: result,
+                message: BASE64.encode(result),
             }))
         }
         UpdatePassword::FinishUpdate {
@@ -94,7 +95,7 @@ pub async fn handle(
                     return Err(Error::SessionExpired);
                 }
                 let password_data =
-                    finish_registration(RegistrationUpload::deserialize(&message)?)?;
+                    finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
                 let binary = Binary {
                     subtype: bson::spec::BinarySubtype::Generic,
                     bytes: password_data,

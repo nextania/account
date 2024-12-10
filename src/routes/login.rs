@@ -10,7 +10,7 @@ use totp_rs::{Algorithm, Secret, TOTP};
 use ulid::Ulid;
 
 use crate::{
-    authenticate::UserJwt,
+    authenticate::{validate_token, UserJwt},
     constants::{LONG_SESSION, SHORT_SESSION},
     database::{self, session::Session, user::User},
     environment::{JWT_SECRET, SERVICE_NAME},
@@ -79,6 +79,7 @@ pub struct PendingMfa {
     pub friendly_name: Option<String>,
     pub existing_session: Option<Session>,
 }
+
 pub struct ActiveEscalation {
     pub session_id: String,
     pub user_id: String,
@@ -105,6 +106,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 let Some(token) = token else {
                     return Err(Error::MissingToken);
                 };
+                validate_token(&token.clone()).await?;
                 let collection = crate::database::session::get_collection();
                 let session = collection
                     .find_one(doc! {
@@ -166,6 +168,11 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 CredentialFinalization::deserialize(&BASE64.decode(message)?)?,
             )?;
             let user = pending_login.user.clone();
+            if let Some(existing_session) = pending_login.existing_session.clone() {
+                if user.id != existing_session.user_id {
+                    return Err(Error::UserMismatch);
+                }
+            }
             if user.mfa_enabled {
                 let new_continue_token = generate_continue_token_long();
                 let mfa_session = PendingMfa {
