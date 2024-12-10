@@ -13,7 +13,6 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct AccountSettings {
     username: Option<String>,
-    email: Option<String>,
     // destructive actions
     escalation_token: String,
 }
@@ -44,20 +43,6 @@ pub async fn handle(
             return Err(Error::UsernameAlreadyTaken);
         }
         update_query.insert("username", username.trim());
-    }
-    if let Some(email) = account_settings.email {
-        if !EMAIL_RE.is_match(email.trim()) {
-            return Err(Error::InvalidEmail);
-        }
-        let user = user_collection
-            .find_one(doc! {
-                "email": email.trim()
-            })
-            .await?;
-        if user.is_some() {
-            return Err(Error::UserExists);
-        }
-        update_query.insert("email", email);
     }
     user_collection
         .update_one(
