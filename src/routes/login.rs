@@ -1,144 +1,258 @@
 use actix_web::{web, Responder};
-use bcrypt::verify;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as BASE64, Engine};
 use dashmap::DashMap;
 use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
 use mongodb::bson::doc;
+use opaque_ke::{CredentialFinalization, CredentialRequest, ServerLogin};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use totp_rs::{Algorithm, Secret, TOTP};
+use ulid::Ulid;
 
 use crate::{
-    authenticate::UserJwt,
+    authenticate::{validate_token, UserJwt},
+    constants::{LONG_SESSION, SHORT_SESSION},
     database::{self, session::Session, user::User},
-    environment::JWT_SECRET,
+    environment::{JWT_SECRET, SERVICE_NAME},
     errors::{Error, Result},
+    opaque::{begin_login, finish_login, Default},
+    utilities::{generate_continue_token_long, get_time_millis, get_time_secs},
 };
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Login {
-    stage: i8,
-    email: Option<String>,
-    continue_token: Option<String>,
-    password: Option<String>,
-    persist: Option<bool>,
-    code: Option<String>,
-    friendly_name: Option<String>,
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "stage")]
+pub enum Login {
+    BeginLogin {
+        email: String,
+        message: String,
+
+        escalate: bool,
+        // req'd if escalating an existing session
+        token: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    FinishLogin {
+        message: String,
+        continue_token: String,
+        persist: Option<bool>,
+        friendly_name: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Mfa {
+        code: String,
+        continue_token: String,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LoginResponse {
-    mfa_enabled: Option<bool>,
-    token: Option<String>,
-    continue_token: Option<String>,
+#[serde(rename_all = "camelCase", untagged)]
+pub enum LoginResponse {
+    #[serde(rename_all = "camelCase")]
+    BeginLogin {
+        continue_token: String,
+        message: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    FinishLogin {
+        mfa_enabled: bool,
+        continue_token: Option<String>,
+        token: Option<String>,
+    },
+    Mfa {
+        token: String,
+    },
+}
+
+pub struct PendingLogin {
+    pub time: u64,
+    pub user: User,
+    pub email: String,
+    pub data: ServerLogin<Default>,
+    pub existing_session: Option<Session>,
 }
 
 pub struct PendingMfa {
     pub time: u64,
     pub user: User,
     pub email: String,
+    pub persist: Option<bool>,
+    pub friendly_name: Option<String>,
+    pub existing_session: Option<Session>,
+}
+
+pub struct ActiveEscalation {
+    pub session_id: String,
+    pub user_id: String,
+    pub time: u64,
+    pub token: String,
 }
 
 lazy_static! {
+    pub static ref PENDING_LOGINS: DashMap<String, PendingLogin> = DashMap::new();
     pub static ref PENDING_MFAS: DashMap<String, PendingMfa> = DashMap::new();
+    pub static ref ACTIVE_ESCALATIONS: DashMap<String, ActiveEscalation> = DashMap::new();
 }
 
 pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
     let login = login.into_inner();
-    match login.stage {
-        1 => {
+    match login {
+        Login::BeginLogin {
+            email,
+            message,
+            escalate,
+            token,
+        } => {
+            let existing_session = if escalate {
+                let Some(token) = token else {
+                    return Err(Error::MissingToken);
+                };
+                validate_token(&token.clone()).await?;
+                let collection = crate::database::session::get_collection();
+                let session = collection
+                    .find_one(doc! {
+                        "token": token.clone()
+                    })
+                    .await?
+                    .ok_or(Error::SessionExpired)?;
+                Some(session)
+            } else {
+                None
+            };
             let collection = crate::database::user::get_collection();
-            let Some(email) = login.email else {
-                return Err(Error::MissingEmail);
-            };
-            let Some(password) = login.password else {
-                return Err(Error::MissingPassword);
-            };
-            let result = collection
+            let user = collection
                 .find_one(doc! {
                     "email": email.clone()
                 })
                 .await?;
-            let Some(user_exists) = result else {
-                return Err(Error::IncorrectCredentials);
-            };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            let verified = verify(password, &user_exists.password_hash)
-                .expect("Unexpected error: failed to verify password");
-            if !verified {
-                return Err(Error::IncorrectCredentials);
-            }
-            if user_exists.mfa_enabled {
-                let continue_token = ulid::Ulid::new().to_string();
-                let pending_mfa = PendingMfa {
-                    time: duration.as_secs(),
-                    user: user_exists.clone(),
-                    email: email.clone(),
+            let password_data = user.clone().map(|x| x.password_data);
+            let (data, state) = begin_login(
+                email.clone(),
+                password_data,
+                CredentialRequest::deserialize(&BASE64.decode(message)?)?,
+            )
+            .await?;
+            let continue_token = generate_continue_token_long();
+            if let Some(user) = user {
+                let pending_login = PendingLogin {
+                    time: get_time_secs(),
+                    user,
+                    email,
+                    data: state,
+                    existing_session,
                 };
-                PENDING_MFAS.insert(continue_token.clone(), pending_mfa);
-                Ok(web::Json(LoginResponse {
+                PENDING_LOGINS.insert(continue_token.clone(), pending_login);
+            }
+            Ok(web::Json(LoginResponse::BeginLogin {
+                continue_token,
+                message: BASE64.encode(data),
+            }))
+        }
+        Login::FinishLogin {
+            message,
+            continue_token,
+            persist,
+            friendly_name,
+        } => {
+            let pending_login = PENDING_LOGINS.get(&continue_token);
+            let pending_login = match pending_login {
+                Some(pending_login) => pending_login,
+                None => return Err(Error::SessionExpired),
+            };
+            if get_time_secs() - pending_login.time > 3600 {
+                drop(pending_login);
+                PENDING_LOGINS.remove(&continue_token);
+                return Err(Error::SessionExpired);
+            }
+            finish_login(
+                pending_login.data.clone(),
+                CredentialFinalization::deserialize(&BASE64.decode(message)?)?,
+            )?;
+            let user = pending_login.user.clone();
+            if let Some(existing_session) = pending_login.existing_session.clone() {
+                if user.id != existing_session.user_id {
+                    return Err(Error::UserMismatch);
+                }
+            }
+            if user.mfa_enabled {
+                let new_continue_token = generate_continue_token_long();
+                let mfa_session = PendingMfa {
+                    time: get_time_secs(),
+                    user,
+                    email: pending_login.email.clone(),
+                    persist,
+                    friendly_name,
+                    existing_session: pending_login.existing_session.clone(),
+                };
+                PENDING_MFAS.insert(new_continue_token.clone(), mfa_session);
+                drop(pending_login);
+                PENDING_LOGINS.remove(&continue_token);
+                Ok(web::Json(LoginResponse::FinishLogin {
+                    mfa_enabled: true,
+                    continue_token: Some(new_continue_token),
                     token: None,
-                    continue_token: Some(continue_token),
-                    mfa_enabled: Some(true),
                 }))
             } else {
-                let persist = login.persist.unwrap_or(false);
-                let millis = duration.as_millis();
+                let persist = persist.unwrap_or(false);
+                let millis = get_time_millis();
                 let expires_at = if persist {
-                    millis + 2592000000
+                    millis + LONG_SESSION
                 } else {
-                    millis + 604800000
-                };
-                let jwt_object = UserJwt {
-                    id: user_exists.id.clone(),
-                    issued_at: millis,
-                    expires_at,
+                    millis + SHORT_SESSION
                 };
                 let token = encode(
                     &Header::default(),
-                    &jwt_object,
+                    &UserJwt {
+                        id: user.id.clone(),
+                        issued_at: millis,
+                        expires_at,
+                    },
                     &EncodingKey::from_secret(JWT_SECRET.as_ref()),
                 )
                 .expect("Unexpected error: failed to encode token");
-                let sid = ulid::Ulid::new().to_string();
-                let session = Session {
-                    id: sid,
-                    token: token.clone(),
-                    friendly_name: login.friendly_name.unwrap_or("Unknown".to_owned()),
-                    user_id: user_exists.id.clone(),
-                };
-                let sessions = crate::database::session::get_collection();
-                sessions.insert_one(session).await?;
-                Ok(web::Json(LoginResponse {
+                if let Some(existing_session) = pending_login.existing_session.clone() {
+                    ACTIVE_ESCALATIONS.insert(
+                        token.clone(),
+                        ActiveEscalation {
+                            session_id: existing_session.id.clone(),
+                            time: get_time_secs(),
+                            token: token.clone(),
+                            user_id: user.id.clone(),
+                        },
+                    );
+                } else {
+                    let sid = Ulid::new().to_string();
+                    let session = Session {
+                        id: sid,
+                        token: token.clone(),
+                        friendly_name: friendly_name.unwrap_or("Unknown".to_owned()),
+                        user_id: user.id.clone(),
+                    };
+                    let sessions = crate::database::session::get_collection();
+                    sessions.insert_one(session).await?;
+                }
+                drop(pending_login);
+                PENDING_LOGINS.remove(&continue_token);
+                Ok(web::Json(LoginResponse::FinishLogin {
                     token: Some(token),
                     continue_token: None,
-                    mfa_enabled: Some(false),
+                    mfa_enabled: false,
                 }))
             }
         }
-        2 => {
-            let Some(continue_token) = login.continue_token else {
-                return Err(Error::MissingContinueToken);
-            };
+        Login::Mfa {
+            code,
+            continue_token,
+        } => {
             let mfa_session = PENDING_MFAS.get(&continue_token);
             let Some(mfa_session) = mfa_session else {
                 return Err(Error::SessionExpired);
             };
-            let duration = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Unexpected error: time went backwards");
-            if duration.as_secs() - mfa_session.time > 3600 {
+            if get_time_secs() - mfa_session.time > 3600 {
                 drop(mfa_session);
                 PENDING_MFAS.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let Some(code) = login.code else {
-                return Err(Error::MissingCode);
-            };
+
             let secret = Secret::Encoded(mfa_session.user.mfa_secret.clone().unwrap());
             let totp = TOTP::new(
                 Algorithm::SHA256,
@@ -146,7 +260,7 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                 1,
                 30,
                 secret.to_bytes().unwrap(),
-                Some("Nextflow Cloud Technologies".to_string()),
+                Some(SERVICE_NAME.to_string()),
                 mfa_session.email.clone(),
             )
             .expect("Unexpected error: could not create TOTP instance");
@@ -170,42 +284,51 @@ pub async fn handle(login: web::Json<Login>) -> Result<impl Responder> {
                     })
                     .await?;
             }
-            let persist = login.persist.unwrap_or(false);
-            let millis = duration.as_millis();
+            let persist = mfa_session.persist.unwrap_or(false);
+            let millis = get_time_millis();
             let expires_at = if persist {
                 millis + 2592000000
             } else {
                 millis + 604800000
             };
             let id = mfa_session.user.id.clone();
-            let jwt_object = UserJwt {
-                id: id.clone(),
-                issued_at: millis,
-                expires_at,
-            };
             let token = encode(
                 &Header::default(),
-                &jwt_object,
+                &UserJwt {
+                    id: id.clone(),
+                    issued_at: millis,
+                    expires_at,
+                },
                 &EncodingKey::from_secret(JWT_SECRET.as_ref()),
             )
             .expect("Unexpected error: failed to encode token");
+            if let Some(existing_session) = mfa_session.existing_session.clone() {
+                ACTIVE_ESCALATIONS.insert(
+                    token.clone(),
+                    ActiveEscalation {
+                        session_id: existing_session.id.clone(),
+                        time: get_time_secs(),
+                        token: token.clone(),
+                        user_id: id.clone(),
+                    },
+                );
+            } else {
+                let sid = ulid::Ulid::new().to_string();
+                let session = Session {
+                    id: sid,
+                    token: token.clone(),
+                    friendly_name: mfa_session
+                        .friendly_name
+                        .clone()
+                        .unwrap_or("Unknown".to_owned()),
+                    user_id: id,
+                };
+                let sessions = crate::database::session::get_collection();
+                sessions.insert_one(session).await?;
+            }
             drop(mfa_session);
             PENDING_MFAS.remove(&continue_token);
-            let sid = ulid::Ulid::new().to_string();
-            let session = Session {
-                id: sid,
-                token: token.clone(),
-                friendly_name: login.friendly_name.unwrap_or("Unknown".to_owned()),
-                user_id: id,
-            };
-            let sessions = crate::database::session::get_collection();
-            sessions.insert_one(session).await?;
-            Ok(web::Json(LoginResponse {
-                token: Some(token),
-                continue_token: None,
-                mfa_enabled: None,
-            }))
+            Ok(web::Json(LoginResponse::Mfa { token }))
         }
-        _ => Err(Error::InvalidStage),
     }
 }

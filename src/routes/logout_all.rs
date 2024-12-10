@@ -6,9 +6,7 @@ use crate::{authenticate::Authenticate, database::session::get_collection, error
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LogoutAllResponse {
-    success: bool,
-}
+pub struct LogoutAllResponse {}
 
 pub async fn handle(jwt: web::ReqData<Result<Authenticate>>) -> Result<impl Responder> {
     let jwt = jwt.into_inner()?;
@@ -19,5 +17,5 @@ pub async fn handle(jwt: web::ReqData<Result<Authenticate>>) -> Result<impl Resp
             "token": doc! { "$ne": jwt.jwt }
         })
         .await?;
-    Ok(web::Json(LogoutAllResponse { success: true }))
+    Ok(web::Json(LogoutAllResponse {}))
 }

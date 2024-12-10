@@ -1,8 +1,11 @@
 use std::fmt::Display;
 
 use actix_web::ResponseError;
+use base64::DecodeError;
 use log::error;
+use opaque_ke::errors::ProtocolError;
 use serde::{Deserialize, Serialize};
+use webauthn_rs::prelude::WebauthnError;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "error", rename_all = "SCREAMING_SNAKE_CASE")]
@@ -16,21 +19,17 @@ pub enum Error {
     UsernameAlreadyTaken,
     UserNotFound,
     UserExists,
+    UserMismatch,
 
-    MissingEmail,
     InvalidEmail,
-    MissingPassword,
-    MissingCode,
     DisplayNameTooLong,
     DescriptionTooLong,
     WebsiteTooLong,
 
-    IncorrectCredentials,
+    CredentialError,
     IncorrectCode,
 
-    MissingContinueToken,
     SessionExpired,
-    InvalidStage,
 
     IpMissing,
 
@@ -67,21 +66,17 @@ impl ResponseError for Error {
             Error::UsernameAlreadyTaken => actix_web::http::StatusCode::CONFLICT,
             Error::UserNotFound => actix_web::http::StatusCode::NOT_FOUND,
             Error::UserExists => actix_web::http::StatusCode::CONFLICT,
+            Error::UserMismatch => actix_web::http::StatusCode::UNAUTHORIZED,
 
-            Error::MissingEmail => actix_web::http::StatusCode::BAD_REQUEST,
             Error::InvalidEmail => actix_web::http::StatusCode::BAD_REQUEST,
-            Error::MissingPassword => actix_web::http::StatusCode::BAD_REQUEST,
-            Error::MissingCode => actix_web::http::StatusCode::BAD_REQUEST,
             Error::DisplayNameTooLong => actix_web::http::StatusCode::BAD_REQUEST,
             Error::DescriptionTooLong => actix_web::http::StatusCode::BAD_REQUEST,
             Error::WebsiteTooLong => actix_web::http::StatusCode::BAD_REQUEST,
 
-            Error::IncorrectCredentials => actix_web::http::StatusCode::UNAUTHORIZED,
+            Error::CredentialError => actix_web::http::StatusCode::UNAUTHORIZED,
             Error::IncorrectCode => actix_web::http::StatusCode::UNAUTHORIZED,
 
-            Error::MissingContinueToken => actix_web::http::StatusCode::BAD_REQUEST,
             Error::SessionExpired => actix_web::http::StatusCode::UNAUTHORIZED,
-            Error::InvalidStage => actix_web::http::StatusCode::BAD_REQUEST,
 
             Error::IpMissing => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
 
@@ -110,6 +105,24 @@ impl From<mongodb::error::Error> for Error {
     fn from(db: mongodb::error::Error) -> Self {
         error!("Database error: {}", db);
         Error::DatabaseError
+    }
+}
+
+impl From<ProtocolError> for Error {
+    fn from(_: ProtocolError) -> Self {
+        Error::CredentialError
+    }
+}
+
+impl From<WebauthnError> for Error {
+    fn from(_: WebauthnError) -> Self {
+        Error::CredentialError
+    }
+}
+
+impl From<DecodeError> for Error {
+    fn from(_: DecodeError) -> Self {
+        Error::CredentialError
     }
 }
 

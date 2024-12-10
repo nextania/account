@@ -1,42 +1,42 @@
 [package]
-name = "sso-system"
-version = "0.1.0"
+name = "account-services"
+version = "1.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-std = { version = "1.12.0", features = ["attributes", "tokio1"] }
-futures-util = "0.3.30"
-regex = "1.10.4"
+async-std = { version = "1.13.0", features = ["attributes", "tokio1"] }
+futures-util = "0.3.31"
+regex = "1.11.1"
 
-dashmap = "6.0.0"
-lazy_static = "1.4.0"
-once_cell = "1.19.0"
+dashmap = "6.1.0"
+lazy_static = "1.5.0"
+once_cell = "1.20.2"
 
-env_logger = "0.11.3"
-log = "0.4.21"
+dotenvy = "0.15.7"
+env_logger = "0.11.5"
+log = "0.4.22"
 
 aes-gcm = "0.10.3"
-bcrypt = "0.16.0"
 rand = "0.8.5"
 
-actix-web = "4.5.1"
+actix-web = "4.9.0"
 actix-cors = "0.7.0"
-actix-files = "0.6.5"
+actix-files = "0.6.6"
 actix-extensible-rate-limit = "0.4.0"
 
-reqwest = "0.12.4"
-serde = "1.0.199"
-serde_json = "1.0.116"
+reqwest = "0.12.9"
+serde = "1.0.215"
+serde_json = "1.0.133"
 
-mongodb = "3.0.0"
+mongodb = "3.1.0"
 jsonwebtoken = "9.3.0"
-ulid = "1.1.2"
+ulid = "1.1.3"
 
-lettre = { version = "0.11", features = ["async-std1", "async-std1-rustls-tls", "builder", "smtp-transport"], default-features = false }
+lettre = { version = "0.11.11", features = ["async-std1", "async-std1-rustls-tls", "builder", "smtp-transport"], default-features = false }
 
-totp-rs = { version = "5.5.1", features = ["qr"] }
-passkey = "0.3.0"
-opaque-ke = "3.0.0-pre.4"
-dotenvy = "0.15.7"
+totp-rs = { version = "5.6.0", features = ["qr"] }
+opaque-ke = "=3.0.0-pre.5"
+webauthn-rs = { git = "https://github.com/infiniwave/webauthn-rs.git", features = ["conditional-ui", "attestation", "resident-key-support"] }
+base64 = "0.22.1"

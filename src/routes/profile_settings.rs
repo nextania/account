@@ -19,9 +19,7 @@ pub struct ProfileSettings {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProfileSettingsResponse {
-    success: bool,
-}
+pub struct ProfileSettingsResponse {}
 
 pub async fn handle(
     jwt: web::ReqData<Result<Authenticate>>,
@@ -72,5 +70,5 @@ pub async fn handle(
             },
         )
         .await?;
-    Ok(web::Json(ProfileSettingsResponse { success: true }))
+    Ok(web::Json(ProfileSettingsResponse {}))
 }

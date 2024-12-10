@@ -1,16 +1,16 @@
-<h1 align="center">Nextflow SSO authentication system</h1>
+<h1 align="center">Nextflow account services</h1>
 <div align="center">
   
-[![License](https://img.shields.io/github/license/Nextflow-Cloud/sso-system)](https://github.com/Nextflow-Cloud/sso-system/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/Nextflow-Cloud/account)](https://github.com/Nextflow-Cloud/account/blob/main/LICENSE)
 
 </div>
 
 ## About
-The Nextflow SSO authentication system allows you to log in to all Nextflow services with a single account. It aims to be modern and fast for users to log in and manage their account. The system is built with technologies such as Rust and MongoDB.
+The Nextflow account services allow you to log in to all Nextflow services with a single account. It aims to be modern and fast for users to log in and manage their account. The system is built with technologies such as Rust and MongoDB.
 
-This server is built with security in mind and supports TOTP two-factor authentication. In the future, we also aim to support OPAQUE, an asymmetric password authenticated key exchange protocol, as well as WebAuthn, allowing the use of passkeys and physical security keys. 
+This server is built with modern security practices in mind and supports TOTP two-factor authentication, OPAQUE (an asymmetric password authenticated key exchange protocol), and FIDO2 WebAuthn, allowing the use of passkeys and physical security keys. 
 
-This is the Rust-based backend. For the SolidJS-based frontend, please check out [sso-system-client](https://github.com/Nextflow-Cloud/sso-system-client).
+This is the Rust-based backend. For the SolidJS-based frontend, please check out [account-client](https://github.com/Nextflow-Cloud/account-client).
 
 ## Hosting the server
 
@@ -20,7 +20,7 @@ This service uses MongoDB as a database, so you will need a MongoDB cluster or s
 ### Run with Docker
 Running with Docker is the recommended method for hosting this service. It allows you to easily configure and automatically start the service in a container. If you need an included database server, use Docker. Please check [their website](https://docs.docker.com/engine/install/) for more detailed documentation on how to install Docker and configuration. You will need to have the Docker Compose plugin installed along with Docker itself.
 
-Copy `docker-compose.example.yml` into your own `docker-compose.yml` and modify it as needed. If you have an existing MongoDB instance, you may remove the `sso-system-mongodb` entry and point the `MONGODB_URI` and `MONGODB_DATABASE` variables to your own instance. Otherwise, keep the entry to use the included database server.
+Copy `docker-compose.example.yml` into your own `docker-compose.yml` and modify it as needed. If you have an existing MongoDB instance, you may remove the `account-services-mongodb` entry and point the `MONGODB_URI` and `MONGODB_DATABASE` variables to your own instance. Otherwise, keep the entry to use the included database server.
 
 Populate the other environment variables as necessary. Currently, all variables are required for intended operation of the server.
 
@@ -37,6 +37,9 @@ Before running, you should populate the environment variables with the following
 * `HCAPTCHA_SECRET`: A secret from hCaptcha to verify hCaptcha tokens.
 * `CORS_ORIGINS`: A list of origins to allow CORS requests from, separated by commas.
 * `HOST`: The host to bind the server to.
+* `PUBLIC_ROOT`: The outward-facing domain name (including port, if non-standard).
+* `SERVICE_NAME`: The outward-facing name of the service.
+* `RP_ID`: The domain name that passkeys are authorized to.
 * `SMTP_SERVER`: The SMTP server to send from.
 * `SMTP_USERNAME`: The username to use with the SMTP server.
 * `SMTP_PASSWORD`: The password to use with the SMTP server.

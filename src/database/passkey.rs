@@ -2,24 +2,23 @@ use mongodb::Collection;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 
-static COLLECTION: OnceCell<Collection<UserProfile>> = OnceCell::new();
+static COLLECTION: OnceCell<Collection<Passkey>> = OnceCell::new();
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct UserProfile {
+pub struct Passkey {
     pub id: String,
-    pub display_name: String,
-    pub description: String,
-    pub website: String,
-    pub avatar: Option<String>,
-    // TODO: Other fields and better way of management
+    pub credential: webauthn_rs::prelude::Passkey,
+    pub credential_id: String,
+    pub user_id: String,
+    pub friendly_name: String,
 }
 
-pub fn get_collection() -> Collection<UserProfile> {
+pub fn get_collection() -> Collection<Passkey> {
     let collection = COLLECTION.get();
     if let Some(c) = collection {
         c.clone()
     } else {
-        let c = super::get_database().collection::<UserProfile>("profiles");
+        let c = super::get_database().collection::<Passkey>("passkeys");
         COLLECTION
             .set(c.clone())
             .expect("Unexpected error: failed to set collection");

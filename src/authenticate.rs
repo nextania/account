@@ -6,7 +6,6 @@ use std::{
     collections::HashSet,
     future::{ready, Ready},
     rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
@@ -15,6 +14,7 @@ use futures_util::future::LocalBoxFuture;
 use crate::{
     environment::JWT_SECRET,
     errors::{Error, Result},
+    utilities::get_time_millis,
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -64,10 +64,7 @@ pub async fn validate_token(jwt: &String) -> Result<Authenticate> {
         &validation,
     )?;
 
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Unexpected error: time went backwards");
-    let millis = duration.as_millis();
+    let millis = get_time_millis();
     if millis > token_data.claims.expires_at {
         return Err(Error::InvalidToken);
     }
