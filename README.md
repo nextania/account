@@ -1,7 +1,8 @@
-<h1 align="center">Nextflow account services</h1>
+<h1 align="center">Nextania account services</h1>
 <div align="center">
   
 [![License](https://img.shields.io/github/license/Nextflow-Cloud/account)](https://github.com/Nextflow-Cloud/account/blob/main/LICENSE)
+![Login page of version 1.1.0](https://github.com/user-attachments/assets/80762a42-c91e-4ef2-b738-b13eeda51a07)
 
 </div>
 
