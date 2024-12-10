@@ -1,10 +1,16 @@
-<h1 align="center">Nextania account services</h1>
+<div align="center">
+  <img height="40" src="https://github.com/user-attachments/assets/7c5c3288-f08f-4f07-8351-d37e1d825e85" alt="Nextania wordmark" />
+</div>
+<h1 align="center">Account Services</h1>
 <div align="center">
   
 [![License](https://img.shields.io/github/license/Nextflow-Cloud/account)](https://github.com/Nextflow-Cloud/account/blob/main/LICENSE)
+<br />
+<br />
 ![Login page of version 1.1.0](https://github.com/user-attachments/assets/80762a42-c91e-4ef2-b738-b13eeda51a07)
 
 </div>
+
 
 ## About
 The Nextflow account services allow you to log in to all Nextflow services with a single account. It aims to be modern and fast for users to log in and manage their account. The system is built with technologies such as Rust and MongoDB.
