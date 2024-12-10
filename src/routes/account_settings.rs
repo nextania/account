@@ -6,7 +6,7 @@ use crate::{
     authenticate::Authenticate,
     database::user::get_collection,
     errors::{Error, Result},
-    utilities::{validate_escalation, EMAIL_RE, USERNAME_RE},
+    utilities::{validate_escalation, USERNAME_RE},
 };
 
 #[derive(Deserialize, Serialize)]

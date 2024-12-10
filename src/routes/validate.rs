@@ -22,19 +22,13 @@ pub async fn handle(validate: web::Json<Validate>) -> Result<impl Responder> {
         Err(token)
     } else {
         let Some(escalation) = &validate.escalation_token else {
-            return Ok(web::Json(ValidateResponse {
-                escalated: false,
-            }));
+            return Ok(web::Json(ValidateResponse { escalated: false }));
         };
         let escalation = validate_escalation(escalation.to_string(), validate.token.clone()).await;
         if escalation.is_err() {
-            Ok(web::Json(ValidateResponse {
-                escalated: false,
-            }))
+            Ok(web::Json(ValidateResponse { escalated: false }))
         } else {
-            Ok(web::Json(ValidateResponse {
-                escalated: true,
-            }))
+            Ok(web::Json(ValidateResponse { escalated: true }))
         }
     }
 }

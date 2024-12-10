@@ -94,8 +94,9 @@ pub async fn handle(
                     PENDING_UPDATES.remove(&continue_token);
                     return Err(Error::SessionExpired);
                 }
-                let password_data =
-                    finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
+                let password_data = finish_registration(RegistrationUpload::deserialize(
+                    &BASE64.decode(message)?,
+                )?)?;
                 let binary = Binary {
                     subtype: bson::spec::BinarySubtype::Generic,
                     bytes: password_data,

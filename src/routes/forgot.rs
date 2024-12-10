@@ -123,7 +123,8 @@ pub async fn handle(forgot: web::Json<Forgot>) -> Result<impl Responder> {
                 PENDING_FORGOTS2.remove(&continue_token);
                 return Err(Error::SessionExpired);
             }
-            let password_data = finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
+            let password_data =
+                finish_registration(RegistrationUpload::deserialize(&BASE64.decode(message)?)?)?;
             let bin = Binary {
                 bytes: password_data,
                 subtype: bson::spec::BinarySubtype::Generic,
