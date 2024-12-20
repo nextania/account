@@ -4,7 +4,7 @@
 <h1 align="center">Account Services</h1>
 <div align="center">
   
-[![License](https://img.shields.io/github/license/Nextflow-Cloud/account)](https://github.com/Nextflow-Cloud/account/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/nextania/account)](https://github.com/nextania/account/blob/main/LICENSE)
 <br />
 <br />
 ![Login page of version 1.1.0](https://github.com/user-attachments/assets/80762a42-c91e-4ef2-b738-b13eeda51a07)
@@ -13,11 +13,11 @@
 
 
 ## About
-The Nextflow account services allow you to log in to all Nextflow services with a single account. It aims to be modern and fast for users to log in and manage their account. The system is built with technologies such as Rust and MongoDB.
+The Nextania account services allow you to log in to all Nextania services with a single account. It aims to be modern and fast for users to log in and manage their account. The system is built with technologies such as Rust and MongoDB.
 
 This server is built with modern security practices in mind and supports TOTP two-factor authentication, OPAQUE (an asymmetric password authenticated key exchange protocol), and FIDO2 WebAuthn, allowing the use of passkeys and physical security keys. 
 
-This is the Rust-based backend. For the SolidJS-based frontend, please check out [account-client](https://github.com/Nextflow-Cloud/account-client).
+This is the Rust-based backend. For the SolidJS-based frontend, please check out [account-client](https://github.com/nextania/account-client).
 
 ## Hosting the server
 
@@ -50,11 +50,11 @@ Before running, you should populate the environment variables with the following
 * `SMTP_SERVER`: The SMTP server to send from.
 * `SMTP_USERNAME`: The username to use with the SMTP server.
 * `SMTP_PASSWORD`: The password to use with the SMTP server.
-* `SMTP_FROM`: The email address to send from, such as `System <system@nextflow.cloud>`.
+* `SMTP_FROM`: The email address to send from, such as `System <system@nextania.com>`.
 
 With the exception of the mail server, all variables are required. Setting the mail server variables will allow the reset password feature to function.
 
 After doing so, run `cargo run --release` to build and run the server. It may take a while to build, especially on ARM64 systems.
 
 ## Contribute
-Nextflow Cloud Technologies is committed to open-source software and free use. This means that you are free to view, modify, contribute, and support the project. Making a pull request with something useful is highly encouraged as this project is made possible by contributors like you who support the project.
+Nextania Cloud Technologies is committed to open-source software and free use. This means that you are free to view, modify, contribute, and support the project. Making a pull request with something useful is highly encouraged as this project is made possible by contributors like you who support the project.
