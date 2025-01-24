@@ -6,7 +6,7 @@ networks:
 
 services:
   account-services:
-    build: .
+    image: quay.nextania.com/nextania/account:latest
     environment:
       - MONGODB_URI=mongodb://account-services-mongodb:27017
       - MONGODB_DATABASE=accounts

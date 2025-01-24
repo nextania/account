@@ -31,7 +31,9 @@ Copy `docker-compose.example.yml` into your own `docker-compose.yml` and modify 
 
 Populate the other environment variables as necessary. Currently, all variables are required for intended operation of the server.
 
-To start the container, run `docker compose up -d` (with sudo as necessary).
+Additionally, you should build the client bundle and place it in the `bundle` directory. You can build it by following the instructions in [account-client](https://github.com/nextania/account-client).
+
+To start the container, run `docker compose up -d`.
 
 ### Run without Docker 
 Although Docker is the preferred method of running the server, you can do so without Docker as well. You will need to run a MongoDB instance separately or obtain a cluster. 
