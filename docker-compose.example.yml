@@ -19,6 +19,8 @@ services:
       - SERVICE_NAME=Example
       - RP_ID=example.com
     restart: always
+    volumes:
+      - ./bundle:/usr/app/bundle
   account-services-mongodb:
     image: mongo
     volumes: ./database:/data/db
