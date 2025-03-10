@@ -19,7 +19,7 @@ env_logger = "0.11.5"
 log = "0.4.22"
 
 aes-gcm = "0.10.3"
-rand = "0.8.5"
+rand = "0.9.0"
 
 actix-web = "4.9.0"
 actix-cors = "0.7.0"
@@ -37,6 +37,6 @@ ulid = "1.1.3"
 lettre = { version = "0.11.11", features = ["async-std1", "async-std1-rustls-tls", "builder", "smtp-transport"], default-features = false }
 
 totp-rs = { version = "5.6.0", features = ["qr"] }
-opaque-ke = "=3.0.0-pre.5"
+opaque-ke = "=3.0.0"
 webauthn-rs = { git = "https://github.com/infiniwave/webauthn-rs.git", features = ["conditional-ui", "attestation", "resident-key-support"] }
 base64 = "0.22.1"
